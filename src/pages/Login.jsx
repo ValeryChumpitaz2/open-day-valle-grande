@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import "./Login.css";
-
+import API_URL from '../config/api';
 function Login() {
   const navigate = useNavigate();
 
@@ -29,8 +29,8 @@ function Login() {
     setCargando(true);
 
     try {
-      const response = await fetch("http://localhost:8000/login.php", {
-        method: "POST",
+const response = await fetch(`${API_URL}/login.php`, {
+          method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "text/plain"

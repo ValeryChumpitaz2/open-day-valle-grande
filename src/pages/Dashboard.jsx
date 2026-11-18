@@ -37,7 +37,7 @@ import autoTable from "jspdf-autotable";
 
 import "./Dashboard.css";
 
-const API_URL = "http://localhost:8000";
+import API_URL from "../config/api";
 const ITEMS_PER_PAGE = 8;
 
 const MENU_ITEMS = [

@@ -3,32 +3,57 @@
 ob_start();
 
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+header("Vary: Origin");
 
+// Permitir el frontend local.
+$origin = $_SERVER["HTTP_ORIGIN"] ?? "";
+
+if ($origin === "http://localhost:5173") {
+    header("Access-Control-Allow-Origin: " . $origin);
+    header("Access-Control-Allow-Credentials: true");
+}
+
+// Gestionar solicitudes OPTIONS.
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
     ob_end_clean();
     exit;
 }
+
 function responder($codigo, $datos)
 {
     if (ob_get_level() > 0) {
         ob_clean();
     }
 
-    if (!headers_sent()) {
-        http_response_code($codigo);
-    }
+    http_response_code($codigo);
 
     echo json_encode($datos, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-// Gestionar solicitudes previas del navegador
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    responder(204, []);
+// Solo permitir GET y POST.
+$metodo = $_SERVER["REQUEST_METHOD"];
+
+if (!in_array($metodo, ["GET", "POST"], true)) {
+    responder(405, [
+        "success" => false,
+        "message" => "Método no permitido."
+    ]);
+}
+
+// Para consultar inscripciones necesitamos una sesión.
+if ($metodo === "GET") {
+    session_start();
+
+    if (!isset($_SESSION["administrador"])) {
+        responder(401, [
+            "success" => false,
+            "message" => "No tienes autorización para consultar las inscripciones."
+        ]);
+    }
 }
 
 require_once __DIR__ . "/config/database.php";
@@ -38,10 +63,12 @@ try {
     $database = new Database();
     $connection = $database->connect();
 
-    // CONSULTAR INSCRIPCIONES
-    if ($_SERVER["REQUEST_METHOD"] === "GET") {
+    // CONSULTAR INSCRIPCIONES: SOLO ADMINISTRADORES.
+    if ($metodo === "GET") {
 
-        $sql = "SELECT * FROM inscripciones ORDER BY fecha_registro DESC";
+        $sql = "SELECT * FROM inscripciones
+                ORDER BY fecha_registro DESC";
+
         $consulta = $connection->prepare($sql);
         $consulta->execute();
 
@@ -53,8 +80,8 @@ try {
         ]);
     }
 
-    // REGISTRAR INSCRIPCIÓN
-    if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // REGISTRAR INSCRIPCIÓN: ACCESO PÚBLICO.
+    if ($metodo === "POST") {
 
         $datos = json_decode(file_get_contents("php://input"), true);
 
@@ -72,9 +99,9 @@ try {
         $colegio = trim($datos["colegio"] ?? "");
         $grado = trim($datos["grado"] ?? "");
         $distrito = trim($datos["distrito"] ?? "");
-        $asistentes = trim($datos["asistentes"] ?? "");
+        $asistentes = trim((string)($datos["asistentes"] ?? ""));
 
-        // Validar campos obligatorios
+        // Validar campos obligatorios.
         if (
             $nombre === "" ||
             $tipoVisitante === "" ||
@@ -88,7 +115,7 @@ try {
             ]);
         }
 
-        // Validar tipo de visitante
+        // Validar tipo de visitante.
         $tiposPermitidos = [
             "Estudiante",
             "Padre o madre",
@@ -103,7 +130,7 @@ try {
             ]);
         }
 
-        // Validar datos del estudiante
+        // Validar información del estudiante.
         if ($tipoVisitante === "Estudiante") {
 
             if ($colegio === "" || $grado === "") {
@@ -118,15 +145,18 @@ try {
             $grado = null;
         }
 
-        // Validar correo opcional
-        if ($correo !== "" && !filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+        // Validar correo opcional.
+        if (
+            $correo !== "" &&
+            !filter_var($correo, FILTER_VALIDATE_EMAIL)
+        ) {
             responder(400, [
                 "success" => false,
                 "message" => "El correo electrónico no tiene un formato válido."
             ]);
         }
 
-        // Insertar registro
+        // Insertar inscripción.
         $sql = "INSERT INTO inscripciones
             (nombre, tipo_visitante, celular, correo, colegio, grado, distrito, asistentes)
             VALUES
@@ -152,13 +182,9 @@ try {
         ]);
     }
 
-    // Método no permitido
-    responder(405, [
-        "success" => false,
-        "message" => "Método no permitido."
-    ]);
+} catch (Throwable $e) {
 
-} catch (Exception $e) {
+    error_log("Error en inscripciones.php: " . $e->getMessage());
 
     responder(500, [
         "success" => false,

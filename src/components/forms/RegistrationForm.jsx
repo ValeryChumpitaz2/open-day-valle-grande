@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 import './RegistrationForm.css';
-
+import API_URL from '../../config/api';
 // Distritos de la provincia de Cañete
 const DISTRITOS_CANETE = [
   'Asia',
@@ -83,7 +83,7 @@ function RegistrationForm() {
 
     try {
       const respuesta = await fetch(
-        'http://localhost:8000/inscripciones.php',
+        `${API_URL}/inscripciones.php`,
         {
           method: 'POST',
           headers: {
