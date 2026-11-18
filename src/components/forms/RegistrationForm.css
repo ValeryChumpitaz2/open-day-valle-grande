@@ -1,0 +1,242 @@
+
+.registration-section {
+  padding: 100px 0;
+  background: #f5f9fc;
+}
+
+.registration-section .container {
+  max-width: 1320px;
+}
+
+/* ENCABEZADO */
+
+.registration-heading {
+  max-width: 760px;
+  margin: 0 auto 55px;
+  text-align: center;
+}
+
+.registration-heading span {
+  color: #2196c8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.registration-heading h2 {
+  margin: 17px 0;
+  color: #123f67;
+  font-size: clamp(35px, 4vw, 48px);
+  font-weight: 800;
+  letter-spacing: -1.5px;
+}
+
+.registration-heading p {
+  color: #718294;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+/* FORMULARIO */
+
+.registration-card {
+  width: 100%;
+  padding: 55px 65px;
+  background: #ffffff;
+  border: 1px solid #e6edf3;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(18, 63, 103, 0.06);
+}
+
+/* SUBTÍTULOS */
+
+.form-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eaf0f5;
+}
+
+.form-section-heading svg {
+  color: #2196c8;
+}
+
+.form-section-heading h3 {
+  margin: 0;
+  color: #123f67;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+/* CAMPOS */
+
+.registration-field {
+  margin-bottom: 24px;
+}
+
+.registration-field label {
+  display: block;
+  margin-bottom: 9px;
+  color: #31516b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.registration-field .form-control,
+.registration-field .form-select {
+  min-height: 52px;
+  padding: 12px 15px;
+  border: 1px solid #dce6ee;
+  border-radius: 8px;
+  background-color: #fbfdff;
+  color: #31516b;
+  font-size: 14px;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.registration-field .form-control::placeholder {
+  color: #aab7c2;
+}
+
+.registration-field .form-control:focus,
+.registration-field .form-select:focus {
+  border-color: #2196c8;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(33, 150, 200, 0.1);
+}
+
+/* CAMPOS ACADÉMICOS */
+
+.student-fields {
+  margin: 12px 0 30px;
+  padding: 25px 25px 5px;
+  background: #f7fafd;
+  border: 1px solid #e9f0f5;
+  border-radius: 10px;
+  animation: showStudentFields 0.25s ease;
+}
+
+.student-fields .form-section-heading {
+  margin-top: 0;
+}
+
+@keyframes showStudentFields {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* BOTÓN */
+
+.registration-submit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 55px;
+  margin-top: 15px;
+  border: none;
+  border-radius: 8px;
+  background: #1769aa;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.registration-submit:hover {
+  background: #123f67;
+  transform: translateY(-2px);
+}
+
+.registration-privacy {
+  margin: 15px 0 0;
+  color: #91a0ad;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* TABLET */
+
+@media (max-width: 991px) {
+  .registration-card {
+    padding: 40px;
+  }
+}
+
+/* MÓVIL */
+
+@media (max-width: 576px) {
+  .registration-section {
+    padding: 65px 0;
+  }
+
+  .registration-heading {
+    margin-bottom: 35px;
+  }
+
+  .registration-heading h2 {
+    font-size: 34px;
+  }
+
+  .registration-card {
+    padding: 30px 20px;
+    border-radius: 12px;
+  }
+
+  .form-section-heading h3 {
+    font-size: 15px;
+  }
+
+  .student-fields {
+    padding: 20px 15px 5px;
+  }
+}
+
+.registration-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 18px;
+  margin-top: 25px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.registration-message.success {
+  color: #176b48;
+  background: #e9f8f0;
+  border: 1px solid #bce8d0;
+}
+
+.registration-message.error {
+  color: #a52d35;
+  background: #fff0f0;
+  border: 1px solid #f2c5c8;
+}
+
+.registration-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

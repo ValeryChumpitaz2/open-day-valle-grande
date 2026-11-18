@@ -1,0 +1,87 @@
+
+/* =========================================
+   NAVBAR - VALLE GRANDE
+========================================= */
+
+.main-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  background: #123F67 !important;
+  border-bottom: 3px solid #42B6E9;
+  box-shadow: 0 5px 18px rgba(18, 63, 103, 0.15);
+}
+
+.main-navbar .container {
+  min-height: 82px;
+}
+
+.main-navbar .navbar-brand {
+  display: flex;
+  align-items: center;
+}
+
+.main-navbar .logo {
+  width: auto;
+  max-height: 55px;
+  object-fit: contain;
+}
+
+/* ENLACES */
+
+.main-navbar .nav-link {
+  color: #FFFFFF !important;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 13px;
+  transition: color 0.25s ease;
+}
+
+.main-navbar .nav-link:hover {
+  color: #65C6A5 !important;
+}
+
+/* BOTÓN DE INSCRIPCIÓN */
+
+.main-navbar .btn-primary {
+  background: #FFC857;
+  border-color: #FFC857;
+  color: #173B5E !important;
+  font-weight: 800;
+  transition: all 0.25s ease;
+}
+
+.main-navbar .btn-primary:hover {
+  background: #FFD77F;
+  border-color: #FFD77F;
+  transform: translateY(-2px);
+}
+
+/* MENÚ RESPONSIVE */
+
+.main-navbar .navbar-toggler {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: none;
+}
+
+.main-navbar .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+.main-navbar .navbar-toggler:focus {
+  box-shadow: 0 0 0 3px rgba(66, 182, 233, 0.25);
+}
+
+@media (max-width: 991px) {
+  .main-navbar .navbar-collapse {
+    padding: 15px 0;
+  }
+
+  .main-navbar .nav-link {
+    padding: 12px 0;
+  }
+
+  .main-navbar .navbar-nav {
+    align-items: flex-start !important;
+  }
+}

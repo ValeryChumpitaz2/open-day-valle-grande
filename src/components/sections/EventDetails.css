@@ -1,0 +1,140 @@
+
+.event-details-section {
+  padding: 100px 0;
+  background: #ffffff;
+}
+
+.event-poster-layout {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  align-items: center;
+  gap: 75px;
+}
+
+.event-poster-text {
+  max-width: 470px;
+}
+
+.event-poster-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #1769aa;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.event-poster-label svg {
+  color: #57bd91;
+}
+
+.event-poster-text h2 {
+  margin: 23px 0 20px;
+  color: #123f67;
+  font-size: clamp(38px, 4.5vw, 54px);
+  font-weight: 800;
+  line-height: 1.13;
+  letter-spacing: -1.8px;
+}
+
+.event-poster-text h2 span {
+  display: block;
+  color: #2196c8;
+}
+
+.event-poster-text p {
+  margin-bottom: 30px;
+  color: #718294;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.event-poster-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 23px;
+  background: #ffc857;
+  color: #173b5e;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+
+.event-poster-button:hover {
+  background: #f5b936;
+  color: #173b5e;
+  transform: translateY(-3px);
+}
+
+.event-poster-image-wrapper {
+  width: 100%;
+  padding: 12px;
+  background: #f3f8fc;
+  border-radius: 16px;
+}
+
+.event-poster-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 9px;
+  object-fit: contain;
+}
+
+@media (max-width: 991px) {
+  .event-details-section {
+    padding: 75px 0;
+  }
+
+  .event-poster-layout {
+    grid-template-columns: 1fr 1fr;
+    gap: 35px;
+  }
+
+  .event-poster-text h2 {
+    font-size: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .event-poster-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .event-poster-text {
+    max-width: 600px;
+  }
+
+  .event-poster-text h2 {
+    font-size: 38px;
+  }
+
+  .event-poster-image-wrapper {
+    max-width: 550px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 576px) {
+  .event-details-section {
+    padding: 60px 0;
+  }
+
+  .event-poster-text h2 {
+    font-size: 34px;
+  }
+
+  .event-poster-text p {
+    font-size: 14px;
+  }
+
+  .event-poster-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
