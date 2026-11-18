@@ -1,21 +1,18 @@
 
 FROM php:8.3-apache
 
-# Instalar las extensiones necesarias para MySQL
+# Instalar extensiones para MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Eliminar todos los módulos MPM habilitados
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
-          /etc/apache2/mods-enabled/mpm_*.conf
-
-# Habilitar únicamente prefork y rewrite
-RUN a2enmod mpm_prefork rewrite
-
-# Verificar que Apache tenga una configuración válida
-RUN apache2ctl -t && apache2ctl -M
+# Limpiar todos los módulos MPM habilitados y activar solo prefork
+RUN find /etc/apache2/mods-enabled -maxdepth 1 \
+    \( -name 'mpm_*.load' -o -name 'mpm_*.conf' \) \
+    -delete \
+    && ln -s ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load \
+    && ln -s ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf \
+    && a2enmod rewrite \
+    && apache2ctl -t
 
 WORKDIR /var/www/html
 
 EXPOSE 80
-
-# Nueva construccion para Railway
