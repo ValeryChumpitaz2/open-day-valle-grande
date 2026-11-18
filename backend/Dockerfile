@@ -1,10 +1,10 @@
 
 FROM php:8.3-apache
 
-# Instalar extensiones para MySQL
+# Instalar extensiones necesarias para MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Limpiar todos los módulos MPM habilitados y activar solo prefork
+# Configurar Apache con un único módulo MPM
 RUN find /etc/apache2/mods-enabled -maxdepth 1 \
     \( -name 'mpm_*.load' -o -name 'mpm_*.conf' \) \
     -delete \
@@ -14,5 +14,8 @@ RUN find /etc/apache2/mods-enabled -maxdepth 1 \
     && apache2ctl -t
 
 WORKDIR /var/www/html
+
+# Copiar los archivos del backend al contenedor
+COPY . /var/www/html/
 
 EXPOSE 80
