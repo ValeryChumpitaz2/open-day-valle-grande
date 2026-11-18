@@ -3,7 +3,13 @@ import { useEffect, useState } from 'react';
 import './Countdown.css';
 
 function calculateTime(eventDate) {
-  const difference = new Date(eventDate).getTime() - Date.now();
+  if (!eventDate) return null;
+
+  const targetDate = new Date(eventDate).getTime();
+
+  if (Number.isNaN(targetDate)) return null;
+
+  const difference = targetDate - Date.now();
 
   if (difference <= 0) {
     return {
@@ -15,9 +21,9 @@ function calculateTime(eventDate) {
   }
 
   return {
-    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-    minutes: Math.floor((difference / (1000 * 60)) % 60),
+    days: Math.floor(difference / 86400000),
+    hours: Math.floor((difference / 3600000) % 24),
+    minutes: Math.floor((difference / 60000) % 60),
     seconds: Math.floor((difference / 1000) % 60)
   };
 }
@@ -39,6 +45,8 @@ function Countdown({ eventDate }) {
     return () => clearInterval(interval);
   }, [eventDate]);
 
+  if (!timeLeft) return null;
+
   const counters = [
     { label: 'DÍAS', value: timeLeft.days },
     { label: 'HORAS', value: timeLeft.hours },
@@ -47,7 +55,7 @@ function Countdown({ eventDate }) {
   ];
 
   return (
-    <div className="countdown-section">
+    <section className="countdown-section">
       <div className="countdown-heading">
         <span className="countdown-indicator"></span>
         <h2>¡Cuenta regresiva para nuestro Open Day!</h2>
@@ -63,7 +71,7 @@ function Countdown({ eventDate }) {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
