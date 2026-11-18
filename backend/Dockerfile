@@ -1,19 +1,19 @@
 
 FROM php:8.3-apache
 
+# Instalar las extensiones necesarias para MySQL
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Deshabilitar individualmente los MPM incompatibles
-RUN a2dismod mpm_event || true
-RUN a2dismod mpm_worker || true
+# Eliminar todos los módulos MPM habilitados
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
+          /etc/apache2/mods-enabled/mpm_*.conf
 
-# Habilitar el MPM adecuado para PHP
-RUN a2enmod mpm_prefork
-RUN a2enmod rewrite
+# Habilitar únicamente prefork y rewrite
+RUN a2enmod mpm_prefork rewrite
+
+# Verificar que Apache tenga una configuración válida
+RUN apache2ctl -t && apache2ctl -M
 
 WORKDIR /var/www/html
 
 EXPOSE 80
-
-# Verificar la configuración de Apache durante la construcción
-RUN apache2ctl -M
