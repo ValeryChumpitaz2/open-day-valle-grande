@@ -7,21 +7,42 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Vary: Origin");
 
-// Permitir el frontend local.
-$origin = $_SERVER["HTTP_ORIGIN"] ?? "";
+// Dominios autorizados.
+$origen = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-if ($origin === "http://localhost:5173") {
-    header("Access-Control-Allow-Origin: " . $origin);
+$origenesPermitidos = [
+    "http://localhost:5173"
+];
+
+// Configurar FRONTEND_URLS en Railway.
+// Permite uno o varios dominios separados por comas.
+$dominiosProduccion = getenv("FRONTEND_URLS") ?: "";
+
+if ($dominiosProduccion !== "") {
+    $origenesProduccion = array_map(
+        "trim",
+        explode(",", $dominiosProduccion)
+    );
+
+    $origenesPermitidos = array_merge(
+        $origenesPermitidos,
+        $origenesProduccion
+    );
+}
+
+if (in_array($origen, $origenesPermitidos, true)) {
+    header("Access-Control-Allow-Origin: " . $origen);
     header("Access-Control-Allow-Credentials: true");
 }
 
-// Gestionar solicitudes OPTIONS.
+// Responder solicitudes OPTIONS.
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
     ob_end_clean();
     exit;
 }
 
+// Respuesta JSON.
 function responder($codigo, $datos)
 {
     if (ob_get_level() > 0) {
@@ -29,11 +50,24 @@ function responder($codigo, $datos)
     }
 
     http_response_code($codigo);
-    echo json_encode($datos, JSON_UNESCAPED_UNICODE);
+
+    echo json_encode(
+        $datos,
+        JSON_UNESCAPED_UNICODE
+    );
+
     exit;
 }
 
-// Solo permitir GET y POST.
+// Verificar origen en solicitudes del navegador.
+if ($origen !== "" && !in_array($origen, $origenesPermitidos, true)) {
+    responder(403, [
+        "success" => false,
+        "message" => "Origen no autorizado."
+    ]);
+}
+
+// Verificar método.
 $metodo = $_SERVER["REQUEST_METHOD"];
 
 if (!in_array($metodo, ["GET", "POST"], true)) {
@@ -43,7 +77,7 @@ if (!in_array($metodo, ["GET", "POST"], true)) {
     ]);
 }
 
-// Para consultar inscripciones necesitamos una sesión.
+// GET requiere sesión administrativa.
 if ($metodo === "GET") {
     session_start();
 
@@ -58,12 +92,15 @@ if ($metodo === "GET") {
 require_once __DIR__ . "/config/database.php";
 
 try {
+
     $database = new Database();
     $connection = $database->connect();
 
-    // CONSULTAR INSCRIPCIONES: SOLO ADMINISTRADORES.
+    // CONSULTAR INSCRIPCIONES.
     if ($metodo === "GET") {
-        $sql = "SELECT * FROM inscripciones
+
+        $sql = "SELECT *
+                FROM inscripciones
                 ORDER BY fecha_registro DESC";
 
         $consulta = $connection->prepare($sql);
@@ -75,9 +112,13 @@ try {
         ]);
     }
 
-    // REGISTRAR INSCRIPCIÓN: ACCESO PÚBLICO.
+    // REGISTRAR INSCRIPCIÓN.
     if ($metodo === "POST") {
-        $datos = json_decode(file_get_contents("php://input"), true);
+
+        $datos = json_decode(
+            file_get_contents("php://input"),
+            true
+        );
 
         if (!is_array($datos)) {
             responder(400, [
@@ -86,18 +127,25 @@ try {
             ]);
         }
 
-        // Recibir y limpiar datos.
+        // Recibir datos.
         $nombres = trim($datos["nombres"] ?? "");
         $apellidos = trim($datos["apellidos"] ?? "");
         $tipoVisitante = trim($datos["tipoVisitante"] ?? "");
-        $celular = preg_replace('/\D+/', '', $datos["celular"] ?? "");
+
+        $celular = preg_replace(
+            '/\D+/',
+            '',
+            $datos["celular"] ?? ""
+        );
+
         $correo = trim($datos["correo"] ?? "");
-        $colegio = trim($datos["colegio"] ?? "");
-        $grado = trim($datos["grado"] ?? "");
         $departamento = trim($datos["departamento"] ?? "");
         $provincia = trim($datos["provincia"] ?? "");
         $distrito = trim($datos["distrito"] ?? "");
         $asistentes = trim((string)($datos["asistentes"] ?? ""));
+
+        $colegio = trim($datos["colegio"] ?? "");
+        $grado = trim($datos["grado"] ?? "");
 
         // Validar campos obligatorios.
         if (
@@ -122,11 +170,23 @@ try {
             mb_strlen($apellidos) > 150 ||
             mb_strlen($departamento) > 100 ||
             mb_strlen($provincia) > 100 ||
-            mb_strlen($distrito) > 100
+            mb_strlen($distrito) > 100 ||
+            mb_strlen($correo) > 150 ||
+            mb_strlen($colegio) > 150
         ) {
             responder(400, [
                 "success" => false,
                 "message" => "Uno de los campos supera la longitud permitida."
+            ]);
+        }
+
+        // Nombre completo para mantener compatibilidad.
+        $nombreCompleto = $nombres . " " . $apellidos;
+
+        if (mb_strlen($nombreCompleto) > 150) {
+            responder(400, [
+                "success" => false,
+                "message" => "La combinación de nombres y apellidos supera los 150 caracteres."
             ]);
         }
 
@@ -153,7 +213,7 @@ try {
             ]);
         }
 
-        // Validar información del estudiante.
+        // Validar datos académicos.
         $gradosPermitidos = [
             "3.º de secundaria",
             "4.º de secundaria",
@@ -162,6 +222,7 @@ try {
         ];
 
         if ($tipoVisitante === "Estudiante") {
+
             if ($colegio === "" || $grado === "") {
                 responder(400, [
                     "success" => false,
@@ -175,6 +236,7 @@ try {
                     "message" => "El grado de estudios no es válido."
                 ]);
             }
+
         } else {
             $colegio = null;
             $grado = null;
@@ -191,8 +253,14 @@ try {
             ]);
         }
 
-        // Validar cantidad de asistentes.
-        $asistentesPermitidos = ["1", "2", "3", "4", "5 o más"];
+        // Validar asistentes.
+        $asistentesPermitidos = [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5 o más"
+        ];
 
         if (!in_array($asistentes, $asistentesPermitidos, true)) {
             responder(400, [
@@ -201,40 +269,38 @@ try {
             ]);
         }
 
-        // Mantener el campo nombre para compatibilidad con el Dashboard.
-        $nombreCompleto = $nombres . " " . $apellidos;
-
-        // Insertar inscripción.
-        $sql = "INSERT INTO inscripciones
-            (
-                nombre,
-                nombres,
-                apellidos,
-                tipo_visitante,
-                celular,
-                correo,
-                departamento,
-                provincia,
-                colegio,
-                grado,
-                distrito,
-                asistentes
-            )
-            VALUES
-            (
-                :nombre,
-                :nombres,
-                :apellidos,
-                :tipo_visitante,
-                :celular,
-                :correo,
-                :departamento,
-                :provincia,
-                :colegio,
-                :grado,
-                :distrito,
-                :asistentes
-            )";
+        // Insertar registro.
+        $sql = "INSERT INTO inscripciones (
+                    nombre,
+                    nombres,
+                    apellidos,
+                    tipo_visitante,
+                    celular,
+                    correo,
+                    departamento,
+                    provincia,
+                    colegio,
+                    grado,
+                    distrito,
+                    asistentes,
+                    fecha_registro,
+                    estado
+                ) VALUES (
+                    :nombre,
+                    :nombres,
+                    :apellidos,
+                    :tipo_visitante,
+                    :celular,
+                    :correo,
+                    :departamento,
+                    :provincia,
+                    :colegio,
+                    :grado,
+                    :distrito,
+                    :asistentes,
+                    CURRENT_TIMESTAMP,
+                    'Pendiente'
+                )";
 
         $consulta = $connection->prepare($sql);
 
@@ -261,10 +327,13 @@ try {
     }
 
 } catch (Throwable $e) {
-    error_log("Error en inscripciones.php: " . $e->getMessage());
+
+    error_log(
+        "Error en inscripciones.php: " . $e->getMessage()
+    );
 
     responder(500, [
         "success" => false,
-        "message" => "Ocurrió un error al procesar la solicitud."
+        "message" => "Ocurrió un error al procesar la inscripción."
     ]);
 }
