@@ -7,198 +7,188 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Vary: Origin");
 
-// Dominios autorizados.
-$origen = $_SERVER["HTTP_ORIGIN"] ?? "";
+// =============================================
+// 1. CONFIGURACIÓN CORS
+// =============================================
 
-$origenesPermitidos = [
+$origin = $_SERVER["HTTP_ORIGIN"] ?? "";
+
+$allowedOrigins = [
     "http://localhost:5173"
 ];
 
-// Configurar FRONTEND_URLS en Railway.
-// Permite uno o varios dominios separados por comas.
-$dominiosProduccion = getenv("FRONTEND_URLS") ?: "";
+// Dominios configurados en Railway
+$frontendUrls = getenv("FRONTEND_URLS") ?: "";
 
-if ($dominiosProduccion !== "") {
-    $origenesProduccion = array_map(
-        "trim",
-        explode(",", $dominiosProduccion)
-    );
+if (!empty($frontendUrls)) {
+    $extraOrigins = explode(",", $frontendUrls);
 
-    $origenesPermitidos = array_merge(
-        $origenesPermitidos,
-        $origenesProduccion
-    );
+    foreach ($extraOrigins as $url) {
+        $url = trim($url);
+
+        if (!empty($url)) {
+            $allowedOrigins[] = rtrim($url, "/");
+        }
+    }
 }
 
-if (in_array($origen, $origenesPermitidos, true)) {
-    header("Access-Control-Allow-Origin: " . $origen);
+if (in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: " . $origin);
     header("Access-Control-Allow-Credentials: true");
 }
 
-// Responder solicitudes OPTIONS.
+// =============================================
+// 2. RESPUESTA OPTIONS
+// =============================================
+
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
-    ob_end_clean();
     exit;
 }
 
-// Respuesta JSON.
-function responder($codigo, $datos)
-{
-    if (ob_get_level() > 0) {
-        ob_clean();
-    }
-
-    http_response_code($codigo);
-
-    echo json_encode(
-        $datos,
-        JSON_UNESCAPED_UNICODE
-    );
-
-    exit;
-}
-
-// Verificar origen en solicitudes del navegador.
-if ($origen !== "" && !in_array($origen, $origenesPermitidos, true)) {
-    responder(403, [
-        "success" => false,
-        "message" => "Origen no autorizado."
-    ]);
-}
-
-// Verificar método.
-$metodo = $_SERVER["REQUEST_METHOD"];
-
-if (!in_array($metodo, ["GET", "POST"], true)) {
-    responder(405, [
-        "success" => false,
-        "message" => "Método no permitido."
-    ]);
-}
-
-// GET requiere sesión administrativa.
-if ($metodo === "GET") {
-    session_start();
-
-    if (!isset($_SESSION["administrador"])) {
-        responder(401, [
-            "success" => false,
-            "message" => "No tienes autorización para consultar las inscripciones."
-        ]);
-    }
-}
+// =============================================
+// 3. CONEXIÓN A BASE DE DATOS
+// =============================================
 
 require_once __DIR__ . "/config/database.php";
 
 try {
 
-    $database = new Database();
-    $connection = $database->connect();
+    $db = new Database();
+    $conexion = $db->connect();
 
-    // CONSULTAR INSCRIPCIONES.
-    if ($metodo === "GET") {
-
-        $sql = "SELECT *
-                FROM inscripciones
-                ORDER BY fecha_registro DESC";
-
-        $consulta = $connection->prepare($sql);
-        $consulta->execute();
-
-        responder(200, [
-            "success" => true,
-            "data" => $consulta->fetchAll(PDO::FETCH_ASSOC)
-        ]);
+    if (!$conexion) {
+        throw new Exception("No se pudo conectar a la base de datos.");
     }
 
-    // REGISTRAR INSCRIPCIÓN.
-    if ($metodo === "POST") {
+    // =============================================
+    // 4. MÉTODO GET - CONSULTA ADMINISTRATIVA
+    // =============================================
 
-        $datos = json_decode(
-            file_get_contents("php://input"),
-            true
+    if ($_SERVER["REQUEST_METHOD"] === "GET") {
+
+        session_start();
+
+        if (!isset($_SESSION["administrador"])) {
+            http_response_code(401);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "No tienes autorización para consultar las inscripciones."
+            ]);
+
+            exit;
+        }
+
+        $sql = "SELECT * FROM inscripciones ORDER BY fecha_registro DESC";
+
+        $stmt = $conexion->prepare($sql);
+        $stmt->execute();
+
+        $inscripciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            "success" => true,
+            "data" => $inscripciones
+        ]);
+
+        exit;
+    }
+
+    // =============================================
+    // 5. MÉTODO POST - REGISTRAR INSCRIPCIÓN
+    // =============================================
+
+    if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+        $contenido = file_get_contents("php://input");
+
+        $data = json_decode($contenido, true);
+
+        if (!is_array($data)) {
+            http_response_code(400);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Los datos enviados no tienen un formato JSON válido."
+            ]);
+
+            exit;
+        }
+
+        // -----------------------------------------
+        // Compatibilidad de nombres React / PHP
+        // -----------------------------------------
+
+        $nombres = trim($data["nombres"] ?? "");
+        $apellidos = trim($data["apellidos"] ?? "");
+
+        $tipoVisitante = trim(
+            $data["tipoVisitante"]
+            ?? $data["tipo_visitante"]
+            ?? ""
         );
 
-        if (!is_array($datos)) {
-            responder(400, [
-                "success" => false,
-                "message" => "Los datos enviados no son válidos."
-            ]);
+        $celular = trim($data["celular"] ?? "");
+        $correo = trim($data["correo"] ?? "");
+
+        $colegio = trim($data["colegio"] ?? "");
+        $grado = trim($data["grado"] ?? "");
+
+        $departamento = trim($data["departamento"] ?? "");
+        $provincia = trim($data["provincia"] ?? "");
+        $distrito = trim($data["distrito"] ?? "");
+
+        $asistentes = trim($data["asistentes"] ?? "");
+
+        // -----------------------------------------
+        // Validar campos obligatorios
+        // -----------------------------------------
+
+        $camposObligatorios = [
+            "nombres" => $nombres,
+            "apellidos" => $apellidos,
+            "tipo de visitante" => $tipoVisitante,
+            "celular" => $celular,
+            "distrito" => $distrito,
+            "cantidad de asistentes" => $asistentes
+        ];
+
+        foreach ($camposObligatorios as $campo => $valor) {
+
+            if ($valor === "") {
+                http_response_code(400);
+
+                echo json_encode([
+                    "success" => false,
+                    "message" => "El campo {$campo} es obligatorio."
+                ]);
+
+                exit;
+            }
         }
 
-        // Recibir datos.
-        $nombres = trim($datos["nombres"] ?? "");
-        $apellidos = trim($datos["apellidos"] ?? "");
-        $tipoVisitante = trim($datos["tipoVisitante"] ?? "");
+        // -----------------------------------------
+        // Validar longitud del nombre completo
+        // -----------------------------------------
 
-        $celular = preg_replace(
-            '/\D+/',
-            '',
-            $datos["celular"] ?? ""
-        );
-
-        $correo = trim($datos["correo"] ?? "");
-        $departamento = trim($datos["departamento"] ?? "");
-        $provincia = trim($datos["provincia"] ?? "");
-        $distrito = trim($datos["distrito"] ?? "");
-        $asistentes = trim((string)($datos["asistentes"] ?? ""));
-
-        $colegio = trim($datos["colegio"] ?? "");
-        $grado = trim($datos["grado"] ?? "");
-
-        // Validar campos obligatorios.
-        if (
-            $nombres === "" ||
-            $apellidos === "" ||
-            $tipoVisitante === "" ||
-            $celular === "" ||
-            $departamento === "" ||
-            $provincia === "" ||
-            $distrito === "" ||
-            $asistentes === ""
-        ) {
-            responder(400, [
-                "success" => false,
-                "message" => "Completa todos los campos obligatorios."
-            ]);
-        }
-
-        // Validar longitudes.
-        if (
-            mb_strlen($nombres) > 150 ||
-            mb_strlen($apellidos) > 150 ||
-            mb_strlen($departamento) > 100 ||
-            mb_strlen($provincia) > 100 ||
-            mb_strlen($distrito) > 100 ||
-            mb_strlen($correo) > 150 ||
-            mb_strlen($colegio) > 150
-        ) {
-            responder(400, [
-                "success" => false,
-                "message" => "Uno de los campos supera la longitud permitida."
-            ]);
-        }
-
-        // Nombre completo para mantener compatibilidad.
         $nombreCompleto = $nombres . " " . $apellidos;
 
         if (mb_strlen($nombreCompleto) > 150) {
-            responder(400, [
+            http_response_code(400);
+
+            echo json_encode([
                 "success" => false,
-                "message" => "La combinación de nombres y apellidos supera los 150 caracteres."
+                "message" => "El nombre completo supera los 150 caracteres."
             ]);
+
+            exit;
         }
 
-        // Validar celular peruano.
-        if (!preg_match('/^9\d{8}$/', $celular)) {
-            responder(400, [
-                "success" => false,
-                "message" => "Ingresa un celular peruano válido de 9 dígitos."
-            ]);
-        }
+        // -----------------------------------------
+        // Validar tipo de visitante
+        // -----------------------------------------
 
-        // Validar tipo de visitante.
         $tiposPermitidos = [
             "Estudiante",
             "Padre o madre",
@@ -207,69 +197,119 @@ try {
         ];
 
         if (!in_array($tipoVisitante, $tiposPermitidos, true)) {
-            responder(400, [
+            http_response_code(400);
+
+            echo json_encode([
                 "success" => false,
                 "message" => "El tipo de visitante no es válido."
             ]);
+
+            exit;
         }
 
-        // Validar datos académicos.
-        $gradosPermitidos = [
-            "3.º de secundaria",
-            "4.º de secundaria",
-            "5.º de secundaria",
-            "Egresado"
-        ];
+        // -----------------------------------------
+        // Validar celular
+        // -----------------------------------------
+
+        if (!preg_match("/^9[0-9]{8}$/", $celular)) {
+            http_response_code(400);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "El número de celular debe tener 9 dígitos y comenzar con 9."
+            ]);
+
+            exit;
+        }
+
+        // -----------------------------------------
+        // Validar correo
+        // -----------------------------------------
+
+        if ($correo !== "" && !filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "El correo electrónico no es válido."
+            ]);
+
+            exit;
+        }
+
+        // -----------------------------------------
+        // Validar datos académicos
+        // -----------------------------------------
 
         if ($tipoVisitante === "Estudiante") {
 
             if ($colegio === "" || $grado === "") {
-                responder(400, [
-                    "success" => false,
-                    "message" => "Indica tu colegio y grado de estudios."
-                ]);
-            }
+                http_response_code(400);
 
-            if (!in_array($grado, $gradosPermitidos, true)) {
-                responder(400, [
+                echo json_encode([
                     "success" => false,
-                    "message" => "El grado de estudios no es válido."
+                    "message" => "Debes completar el colegio y el grado."
                 ]);
+
+                exit;
             }
 
         } else {
-            $colegio = null;
-            $grado = null;
+
+            $colegio = "";
+            $grado = "";
         }
 
-        // Validar correo opcional.
-        if (
-            $correo !== "" &&
-            !filter_var($correo, FILTER_VALIDATE_EMAIL)
-        ) {
-            responder(400, [
-                "success" => false,
-                "message" => "El correo electrónico no tiene un formato válido."
-            ]);
-        }
+        // -----------------------------------------
+        // Validar asistentes
+        // -----------------------------------------
 
-        // Validar asistentes.
-        $asistentesPermitidos = [
-            "1",
-            "2",
-            "3",
-            "4",
-            "5 o más"
-        ];
+        $asistentesPermitidos = ["1", "2", "3", "4", "5"];
 
         if (!in_array($asistentes, $asistentesPermitidos, true)) {
-            responder(400, [
+            http_response_code(400);
+
+            echo json_encode([
                 "success" => false,
                 "message" => "La cantidad de asistentes no es válida."
             ]);
+
+            exit;
         }
 
-        // Insertar registro.
+        // -----------------------------------------
+        // Validar longitudes de campos
+        // -----------------------------------------
+
+        $limites = [
+            "correo" => [$correo, 150],
+            "colegio" => [$colegio, 150],
+            "grado" => [$grado, 50],
+            "departamento" => [$departamento, 100],
+            "provincia" => [$provincia, 100],
+            "distrito" => [$distrito, 100]
+        ];
+
+        foreach ($limites as $campo => $configuracion) {
+
+            [$valor, $maximo] = $configuracion;
+
+            if (mb_strlen($valor) > $maximo) {
+                http_response_code(400);
+
+                echo json_encode([
+                    "success" => false,
+                    "message" => "El campo {$campo} supera el máximo permitido."
+                ]);
+
+                exit;
+            }
+        }
+
+        // =============================================
+        // 6. INSERTAR EN MYSQL
+        // =============================================
+
         $sql = "INSERT INTO inscripciones (
                     nombre,
                     nombres,
@@ -302,38 +342,57 @@ try {
                     'Pendiente'
                 )";
 
-        $consulta = $connection->prepare($sql);
+        $stmt = $conexion->prepare($sql);
 
-        $consulta->execute([
+        $stmt->execute([
             ":nombre" => $nombreCompleto,
             ":nombres" => $nombres,
             ":apellidos" => $apellidos,
             ":tipo_visitante" => $tipoVisitante,
             ":celular" => $celular,
             ":correo" => $correo !== "" ? $correo : null,
-            ":departamento" => $departamento,
-            ":provincia" => $provincia,
-            ":colegio" => $colegio,
-            ":grado" => $grado,
+            ":departamento" => $departamento !== "" ? $departamento : null,
+            ":provincia" => $provincia !== "" ? $provincia : null,
+            ":colegio" => $colegio !== "" ? $colegio : null,
+            ":grado" => $grado !== "" ? $grado : null,
             ":distrito" => $distrito,
             ":asistentes" => $asistentes
         ]);
 
-        responder(201, [
+        // =============================================
+        // 7. RESPUESTA EXITOSA
+        // =============================================
+
+        http_response_code(201);
+
+        echo json_encode([
             "success" => true,
-            "message" => "Inscripción registrada correctamente.",
-            "id" => $connection->lastInsertId()
+            "message" => "¡Tu inscripción se registró correctamente!",
+            "id" => $conexion->lastInsertId()
         ]);
+
+        exit;
     }
+
+    // =============================================
+    // 8. MÉTODO NO PERMITIDO
+    // =============================================
+
+    http_response_code(405);
+
+    echo json_encode([
+        "success" => false,
+        "message" => "Método no permitido."
+    ]);
 
 } catch (Throwable $e) {
 
-    error_log(
-        "Error en inscripciones.php: " . $e->getMessage()
-    );
+    error_log("Error en inscripciones.php: " . $e->getMessage());
 
-    responder(500, [
+    http_response_code(500);
+
+    echo json_encode([
         "success" => false,
-        "message" => "Ocurrió un error al procesar la inscripción."
+        "message" => "Ocurrió un error interno al procesar la inscripción."
     ]);
 }
