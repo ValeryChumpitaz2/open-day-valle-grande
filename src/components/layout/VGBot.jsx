@@ -7,104 +7,104 @@ import {
   CalendarDays,
   MapPin,
   GraduationCap,
-  ClipboardList,
-  MessageCircle,
   Sparkles,
-  ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 
 import "./VGBot.css";
 
 const preguntasFrecuentes = [
   {
-    texto: "Información del evento",
+    texto: "Fecha del evento",
     icono: CalendarDays,
     respuesta:
-      "¡Claro! El Open Day 2026 de Valle Grande se realizará el sábado 12 de diciembre de 2026, desde las 9:00 a. m. ¡Te esperamos!",
+      "El Open Day 2026 de Valle Grande se realizará el sábado 12 de diciembre de 2026, desde las 9:00 a. m. ¡Te esperamos!",
   },
   {
     texto: "¿Dónde se realizará?",
     icono: MapPin,
     respuesta:
-      "El evento se realizará en las instalaciones de Valle Grande. ¡Será una excelente oportunidad para conocer nuestro campus!",
+      "El evento se realizará en el campus de Valle Grande, ubicado en Cañete. Será una excelente oportunidad para conocer nuestras instalaciones.",
   },
   {
-    texto: "Quiero conocer las carreras",
+    texto: "Conocer las carreras",
     icono: GraduationCap,
     respuesta:
-      "¡Excelente! Durante el Open Day podrás conocer nuestra propuesta educativa y recibir información sobre las carreras. También puedes revisar la sección de carreras de nuestra página.",
+      "Durante el Open Day podrás conocer nuestra oferta académica, descubrir las carreras y conversar sobre las oportunidades de formación que ofrece Valle Grande.",
   },
   {
-    texto: "¿Cómo me inscribo?",
-    icono: ClipboardList,
+    texto: "Actividades del evento",
+    icono: Sparkles,
     respuesta:
-      "¡Es muy sencillo! Dirígete al formulario de inscripción de esta página, completa tus datos y registra tu participación. ¡Te esperamos!",
+      "Podrás conocer proyectos digitales, recorrer nuestro campus y participar en juegos y experiencias interactivas. ¡Tendremos actividades para disfrutar y aprender!",
   },
 ];
 
+const normalizar = (texto) =>
+  texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
 const obtenerRespuesta = (mensaje) => {
-  const texto = mensaje.toLowerCase().normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  const texto = normalizar(mensaje);
 
   if (
     texto.includes("fecha") ||
     texto.includes("cuando") ||
+    texto.includes("hora") ||
     texto.includes("dia") ||
-    texto.includes("horario") ||
-    texto.includes("hora")
+    texto.includes("evento")
   ) {
-    return "El Open Day 2026 se realizará el sábado 12 de diciembre, desde las 9:00 a. m. ¡Reserva la fecha!";
+    return preguntasFrecuentes[0].respuesta;
   }
 
   if (
     texto.includes("donde") ||
     texto.includes("ubicacion") ||
     texto.includes("direccion") ||
+    texto.includes("campus") ||
     texto.includes("lugar")
   ) {
-    return "El evento se realizará en Valle Grande. ¡Te esperamos para conocer nuestras instalaciones!";
-  }
-
-  if (
-    texto.includes("inscripcion") ||
-    texto.includes("inscrib") ||
-    texto.includes("registro") ||
-    texto.includes("participar")
-  ) {
-    return "¡Nos alegra que quieras participar! Completa el formulario de inscripción que encontrarás en esta página para registrar tu visita.";
+    return preguntasFrecuentes[1].respuesta;
   }
 
   if (
     texto.includes("carrera") ||
     texto.includes("estudiar") ||
     texto.includes("programa") ||
-    texto.includes("profesion")
+    texto.includes("academica") ||
+    texto.includes("oferta")
   ) {
-    return "Durante el Open Day podrás conocer nuestra propuesta educativa, explorar las carreras y resolver tus dudas con nuestro equipo.";
+    return preguntasFrecuentes[2].respuesta;
   }
 
   if (
     texto.includes("actividad") ||
-    texto.includes("hacer") ||
-    texto.includes("visitar")
+    texto.includes("juego") ||
+    texto.includes("experiencia") ||
+    texto.includes("proyecto")
   ) {
-    return "Podrás conocer las instalaciones, explorar nuestra propuesta educativa y vivir una experiencia junto a la comunidad de Valle Grande.";
+    return preguntasFrecuentes[3].respuesta;
+  }
+
+  if (
+    texto.includes("inscripcion") ||
+    texto.includes("inscribirme") ||
+    texto.includes("registrarme") ||
+    texto.includes("registro") ||
+    texto.includes("formulario")
+  ) {
+    return "Puedes inscribirte completando el formulario de registro disponible en nuestra página web. Ingresa tus datos y envía tu inscripción para participar en el Open Day.";
   }
 
   if (
     texto.includes("costo") ||
     texto.includes("precio") ||
-    texto.includes("gratis") ||
-    texto.includes("pagar")
+    texto.includes("gratis")
   ) {
-    return "Para conocer los detalles sobre los costos o condiciones de participación, te recomendamos consultar directamente con el equipo de Valle Grande.";
-  }
-
-  if (
-    texto.includes("gracias") ||
-    texto.includes("muchas gracias")
-  ) {
-    return "¡Con mucho gusto! 💙 Estamos aquí para ayudarte. ¡Esperamos verte en el Open Day!";
+    return "Para conocer los detalles sobre los costos o condiciones de participación, te recomendamos consultar directamente con el equipo organizador de Valle Grande.";
   }
 
   if (
@@ -113,13 +113,17 @@ const obtenerRespuesta = (mensaje) => {
     texto.includes("buenas tardes") ||
     texto.includes("buenas noches")
   ) {
-    return "¡Hola! 👋 Soy VG Bot, tu asistente virtual de Valle Grande. ¿Qué te gustaría conocer sobre nuestro Open Day?";
+    return "¡Hola! Me alegra saludarte. 😊 Estoy aquí para ayudarte a conocer el Open Day 2026 de Valle Grande.";
   }
 
-  return "¡Gracias por tu pregunta! 😊 Por ahora puedo ayudarte con información sobre el evento, ubicación, carreras, actividades e inscripciones. ¿Sobre cuál de estos temas deseas saber más?";
+  if (texto.includes("gracias")) {
+    return "¡Con mucho gusto! 😊 Será un placer ayudarte. ¡Esperamos verte en nuestro Open Day!";
+  }
+
+  return "¡Gracias por tu pregunta! Por el momento no tengo información específica sobre ese tema. Puedo ayudarte con información sobre la fecha, ubicación, carreras, actividades e inscripción.";
 };
 
-function VGBot() {
+export default function VGBot() {
   const [abierto, setAbierto] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [escribiendo, setEscribiendo] = useState(false);
@@ -128,139 +132,198 @@ function VGBot() {
     {
       tipo: "bot",
       texto:
-        "¡Hola! Soy VG Bot 👋 Estoy aquí para ayudarte a conocer el Open Day 2026 de Valle Grande. ¿En qué puedo ayudarte?",
+        "¡Hola! Soy VG Bot, el asistente virtual de Valle Grande. 👋\n\nEstoy aquí para ayudarte a conocer nuestro Open Day 2026. ¿Qué te gustaría saber?",
     },
   ]);
 
   const mensajesRef = useRef(null);
   const inputRef = useRef(null);
+  const colaRef = useRef([]);
+  const procesandoRef = useRef(false);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (mensajesRef.current) {
-      mensajesRef.current.scrollTop =
-        mensajesRef.current.scrollHeight;
+      mensajesRef.current.scrollTo({
+        top: mensajesRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, [conversacion, escribiendo]);
 
   useEffect(() => {
     if (abierto) {
-      setTimeout(() => inputRef.current?.focus(), 150);
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
+
+      return () => clearTimeout(timer);
     }
   }, [abierto]);
 
-  const enviarMensaje = (texto) => {
-    const contenido = texto.trim();
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
-    if (!contenido || escribiendo) return;
+  const procesarCola = () => {
+    if (procesandoRef.current) return;
 
-    setConversacion((anterior) => [
-      ...anterior,
-      { tipo: "usuario", texto: contenido },
-    ]);
+    const siguiente = colaRef.current.shift();
 
-    setMensaje("");
+    if (!siguiente) {
+      setEscribiendo(false);
+      return;
+    }
+
+    procesandoRef.current = true;
     setEscribiendo(true);
 
-    setTimeout(() => {
-      const respuesta = obtenerRespuesta(contenido);
-
+    timerRef.current = setTimeout(() => {
       setConversacion((anterior) => [
         ...anterior,
-        { tipo: "bot", texto: respuesta },
+        {
+          tipo: "bot",
+          texto:
+            siguiente.respuesta +
+            "\n\n¿Te gustaría saber algo más? Estoy aquí para ayudarte. 😊",
+        },
       ]);
 
-      setEscribiendo(false);
+      procesandoRef.current = false;
+      procesarCola();
     }, 650);
   };
 
-  const seleccionarPregunta = (pregunta) => {
-    enviarMensaje(pregunta);
+  const enviarMensaje = (texto, respuestaPersonalizada = null) => {
+    const contenido = texto.trim();
+
+    if (!contenido) return;
+
+    setConversacion((anterior) => [
+      ...anterior,
+      {
+        tipo: "usuario",
+        texto: contenido,
+      },
+    ]);
+
+    setMensaje("");
+
+    colaRef.current.push({
+      respuesta:
+        respuestaPersonalizada || obtenerRespuesta(contenido),
+    });
+
+    procesarCola();
+  };
+
+  const manejarEnvio = (e) => {
+    e.preventDefault();
+    enviarMensaje(mensaje);
   };
 
   const irAInscripcion = () => {
-    setAbierto(false);
+    const formulario =
+      document.getElementById("inscripcion") ||
+      document.getElementById("registro");
 
-    setTimeout(() => {
-      const formulario =
-        document.getElementById("inscripcion") ||
-        document.getElementById("registro");
+    if (formulario) {
+      setAbierto(false);
 
-      if (formulario) {
+      setTimeout(() => {
         formulario.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
-      } else {
-        setAbierto(true);
-        enviarMensaje("Quiero inscribirme");
-      }
-    }, 150);
+      }, 150);
+    } else {
+      enviarMensaje(
+        "¿Cómo puedo inscribirme?",
+        "Puedes completar el formulario de inscripción disponible en nuestra página web. Si no lo encuentras, revisa la sección de registro."
+      );
+    }
   };
 
   return (
     <div className="vg-bot-container">
 
-      {/* Ventana del chatbot */}
-      {abierto && (
-        <section
-          className="vg-chat-window"
-          aria-label="Asistente virtual VG Bot"
+      {!abierto && (
+        <button
+          className="vg-bot-trigger"
+          onClick={() => setAbierto(true)}
+          aria-label="Abrir asistente virtual"
         >
+          <Bot size={27} />
+          <span className="vg-bot-online"></span>
+        </button>
+      )}
+
+      {abierto && (
+        <section className="vg-chat-window">
+
           {/* Encabezado */}
           <header className="vg-chat-header">
-            <div className="vg-chat-avatar">
-              <Bot size={27} />
-              <span className="vg-avatar-status"></span>
-            </div>
+            <div className="vg-chat-brand">
+              <div className="vg-chat-avatar">
+                <Bot size={23} />
+              </div>
 
-            <div className="vg-chat-header-info">
-              <h3>VG Bot</h3>
-              <span>
-                <i></i>
-                Asistente virtual de Valle Grande
-              </span>
+              <div>
+                <h3>VG Bot</h3>
+                <p>
+                  <span className="vg-status-dot"></span>
+                  Asistente virtual de Valle Grande
+                </p>
+              </div>
             </div>
 
             <button
               className="vg-chat-close"
               onClick={() => setAbierto(false)}
-              aria-label="Cerrar chatbot"
+              aria-label="Cerrar chat"
             >
-              <X size={21} />
+              <X size={19} />
             </button>
           </header>
 
-          {/* Mensajes */}
-          <div className="vg-chat-messages" ref={mensajesRef}>
+          {/* Conversación */}
+          <div
+            className="vg-chat-messages"
+            ref={mensajesRef}
+          >
             <div className="vg-chat-date">
-              <span>OPEN DAY 2026</span>
+              OPEN DAY 2026
             </div>
 
             {conversacion.map((item, index) => (
               <div
                 key={index}
-                className={`vg-message-row ${
+                className={`vg-message ${
                   item.tipo === "usuario"
                     ? "vg-message-user"
-                    : "vg-message-assistant"
+                    : "vg-message-bot"
                 }`}
               >
                 {item.tipo === "bot" && (
                   <div className="vg-message-avatar">
-                    <Bot size={17} />
+                    <Bot size={16} />
                   </div>
                 )}
 
-                <div className="vg-message-bubble">
+                <div className="vg-message-content">
                   {item.texto}
                 </div>
               </div>
             ))}
 
             {escribiendo && (
-              <div className="vg-message-row vg-message-assistant">
+              <div className="vg-message vg-message-bot">
                 <div className="vg-message-avatar">
-                  <Bot size={17} />
+                  <Bot size={16} />
                 </div>
 
                 <div className="vg-typing">
@@ -271,45 +334,47 @@ function VGBot() {
               </div>
             )}
 
-            {/* Preguntas iniciales */}
-            {conversacion.length === 1 && (
-              <div className="vg-quick-questions">
-                <p>Preguntas frecuentes</p>
+            {/* Sugerencias para continuar */}
+            {!escribiendo && (
+              <div className="vg-suggestions">
+                <p>También puedes consultar:</p>
 
-                {preguntasFrecuentes.map((pregunta, index) => {
-                  const Icono = pregunta.icono;
+                <div className="vg-suggestions-list">
+                  {preguntasFrecuentes.map((pregunta, index) => {
+                    const Icono = pregunta.icono;
 
-                  return (
-                    <button
-                      key={index}
-                      onClick={() =>
-                        seleccionarPregunta(pregunta.texto)
-                      }
-                    >
-                      <Icono size={16} />
-                      <span>{pregunta.texto}</span>
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={index}
+                        onClick={() =>
+                          enviarMensaje(
+                            pregunta.texto,
+                            pregunta.respuesta
+                          )
+                        }
+                      >
+                        <Icono size={14} />
+                        {pregunta.texto}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Acceso rápido a inscripción */}
-          <div className="vg-chat-action">
+          {/* Inscripción secundaria */}
+          <div className="vg-chat-register">
             <button onClick={irAInscripcion}>
-              <ClipboardList size={16} />
+              <ClipboardList size={15} />
               Quiero inscribirme
             </button>
           </div>
 
-          {/* Entrada de mensajes */}
+          {/* Entrada de texto */}
           <form
-            className="vg-chat-input-area"
-            onSubmit={(e) => {
-              e.preventDefault();
-              enviarMensaje(mensaje);
-            }}
+            className="vg-chat-input"
+            onSubmit={manejarEnvio}
           >
             <input
               ref={inputRef}
@@ -317,43 +382,24 @@ function VGBot() {
               value={mensaje}
               onChange={(e) => setMensaje(e.target.value)}
               placeholder="Escribe tu pregunta..."
-              aria-label="Escribe tu pregunta"
+              autoComplete="off"
             />
 
             <button
               type="submit"
-              disabled={!mensaje.trim() || escribiendo}
-              aria-label="Enviar mensaje"
+              disabled={!mensaje.trim()}
+              aria-label="Enviar pregunta"
             >
-              <Send size={18} />
+              <Send size={17} />
             </button>
           </form>
 
-          <div className="vg-chat-footer">
-            <Sparkles size={12} />
-            <span>Asistente virtual Open Day 2026</span>
-          </div>
+          <footer className="vg-chat-footer">
+            Valle Grande · Open Day 2026
+          </footer>
+
         </section>
       )}
-
-      {/* Botón flotante */}
-      <button
-        className={`vg-bot-trigger ${abierto ? "active" : ""}`}
-        onClick={() => setAbierto(!abierto)}
-        aria-label={abierto ? "Cerrar VG Bot" : "Abrir VG Bot"}
-      >
-        {abierto ? (
-          <ChevronDown size={27} />
-        ) : (
-          <>
-            <Bot size={30} />
-            <span className="vg-bot-notification"></span>
-          </>
-        )}
-      </button>
-
     </div>
   );
 }
-
-export default VGBot;

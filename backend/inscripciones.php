@@ -29,7 +29,6 @@ function responder($codigo, $datos)
     }
 
     http_response_code($codigo);
-
     echo json_encode($datos, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -59,30 +58,25 @@ if ($metodo === "GET") {
 require_once __DIR__ . "/config/database.php";
 
 try {
-
     $database = new Database();
     $connection = $database->connect();
 
     // CONSULTAR INSCRIPCIONES: SOLO ADMINISTRADORES.
     if ($metodo === "GET") {
-
         $sql = "SELECT * FROM inscripciones
                 ORDER BY fecha_registro DESC";
 
         $consulta = $connection->prepare($sql);
         $consulta->execute();
 
-        $inscripciones = $consulta->fetchAll(PDO::FETCH_ASSOC);
-
         responder(200, [
             "success" => true,
-            "data" => $inscripciones
+            "data" => $consulta->fetchAll(PDO::FETCH_ASSOC)
         ]);
     }
 
     // REGISTRAR INSCRIPCIÓN: ACCESO PÚBLICO.
     if ($metodo === "POST") {
-
         $datos = json_decode(file_get_contents("php://input"), true);
 
         if (!is_array($datos)) {
@@ -92,26 +86,55 @@ try {
             ]);
         }
 
-        $nombre = trim($datos["nombre"] ?? "");
+        // Recibir y limpiar datos.
+        $nombres = trim($datos["nombres"] ?? "");
+        $apellidos = trim($datos["apellidos"] ?? "");
         $tipoVisitante = trim($datos["tipoVisitante"] ?? "");
-        $celular = trim($datos["celular"] ?? "");
+        $celular = preg_replace('/\D+/', '', $datos["celular"] ?? "");
         $correo = trim($datos["correo"] ?? "");
         $colegio = trim($datos["colegio"] ?? "");
         $grado = trim($datos["grado"] ?? "");
+        $departamento = trim($datos["departamento"] ?? "");
+        $provincia = trim($datos["provincia"] ?? "");
         $distrito = trim($datos["distrito"] ?? "");
         $asistentes = trim((string)($datos["asistentes"] ?? ""));
 
         // Validar campos obligatorios.
         if (
-            $nombre === "" ||
+            $nombres === "" ||
+            $apellidos === "" ||
             $tipoVisitante === "" ||
             $celular === "" ||
+            $departamento === "" ||
+            $provincia === "" ||
             $distrito === "" ||
             $asistentes === ""
         ) {
             responder(400, [
                 "success" => false,
                 "message" => "Completa todos los campos obligatorios."
+            ]);
+        }
+
+        // Validar longitudes.
+        if (
+            mb_strlen($nombres) > 150 ||
+            mb_strlen($apellidos) > 150 ||
+            mb_strlen($departamento) > 100 ||
+            mb_strlen($provincia) > 100 ||
+            mb_strlen($distrito) > 100
+        ) {
+            responder(400, [
+                "success" => false,
+                "message" => "Uno de los campos supera la longitud permitida."
+            ]);
+        }
+
+        // Validar celular peruano.
+        if (!preg_match('/^9\d{8}$/', $celular)) {
+            responder(400, [
+                "success" => false,
+                "message" => "Ingresa un celular peruano válido de 9 dígitos."
             ]);
         }
 
@@ -131,8 +154,14 @@ try {
         }
 
         // Validar información del estudiante.
-        if ($tipoVisitante === "Estudiante") {
+        $gradosPermitidos = [
+            "3.º de secundaria",
+            "4.º de secundaria",
+            "5.º de secundaria",
+            "Egresado"
+        ];
 
+        if ($tipoVisitante === "Estudiante") {
             if ($colegio === "" || $grado === "") {
                 responder(400, [
                     "success" => false,
@@ -140,6 +169,12 @@ try {
                 ]);
             }
 
+            if (!in_array($grado, $gradosPermitidos, true)) {
+                responder(400, [
+                    "success" => false,
+                    "message" => "El grado de estudios no es válido."
+                ]);
+            }
         } else {
             $colegio = null;
             $grado = null;
@@ -156,19 +191,62 @@ try {
             ]);
         }
 
+        // Validar cantidad de asistentes.
+        $asistentesPermitidos = ["1", "2", "3", "4", "5 o más"];
+
+        if (!in_array($asistentes, $asistentesPermitidos, true)) {
+            responder(400, [
+                "success" => false,
+                "message" => "La cantidad de asistentes no es válida."
+            ]);
+        }
+
+        // Mantener el campo nombre para compatibilidad con el Dashboard.
+        $nombreCompleto = $nombres . " " . $apellidos;
+
         // Insertar inscripción.
         $sql = "INSERT INTO inscripciones
-            (nombre, tipo_visitante, celular, correo, colegio, grado, distrito, asistentes)
+            (
+                nombre,
+                nombres,
+                apellidos,
+                tipo_visitante,
+                celular,
+                correo,
+                departamento,
+                provincia,
+                colegio,
+                grado,
+                distrito,
+                asistentes
+            )
             VALUES
-            (:nombre, :tipo_visitante, :celular, :correo, :colegio, :grado, :distrito, :asistentes)";
+            (
+                :nombre,
+                :nombres,
+                :apellidos,
+                :tipo_visitante,
+                :celular,
+                :correo,
+                :departamento,
+                :provincia,
+                :colegio,
+                :grado,
+                :distrito,
+                :asistentes
+            )";
 
         $consulta = $connection->prepare($sql);
 
         $consulta->execute([
-            ":nombre" => $nombre,
+            ":nombre" => $nombreCompleto,
+            ":nombres" => $nombres,
+            ":apellidos" => $apellidos,
             ":tipo_visitante" => $tipoVisitante,
             ":celular" => $celular,
             ":correo" => $correo !== "" ? $correo : null,
+            ":departamento" => $departamento,
+            ":provincia" => $provincia,
             ":colegio" => $colegio,
             ":grado" => $grado,
             ":distrito" => $distrito,
@@ -183,7 +261,6 @@ try {
     }
 
 } catch (Throwable $e) {
-
     error_log("Error en inscripciones.php: " . $e->getMessage());
 
     responder(500, [

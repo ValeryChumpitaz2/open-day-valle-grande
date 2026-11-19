@@ -44,16 +44,22 @@ function Hero() {
             </a>
           </div>
 
-          {/* IMAGEN Y CUENTA REGRESIVA */}
+          {/* VIDEO DEL ROBOT Y CUENTA REGRESIVA */}
           <div className="col-lg-7">
             <div className="hero-visual">
-              <img
-                src="/images/estudiantes.jpg"
-                alt="Experiencia educativa en Valle Grande"
-                className="hero-image"
+
+              <video
+                src="/videos/saludo.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="hero-robot-video"
+                aria-label="Robot dando la bienvenida al Open Day"
               />
 
               <Countdown eventDate="2026-12-12T09:00:00-05:00" />
+
             </div>
           </div>
 

@@ -1,34 +1,31 @@
 
-import {
-    Laptop,
-    Building2,
-    Gamepad2
-} from 'lucide-react';
-
 import './AboutEvent.css';
 
 function AboutEvent() {
     const experiences = [
         {
-            icon: Laptop,
             number: '01',
             title: 'Proyectos digitales',
             description:
-                'Conoce las soluciones creadas por nuestros estudiantes.'
+                'Descubre aplicaciones, sistemas y soluciones tecnológicas creadas por nuestros estudiantes.',
+            image: '/images/proyectos-digitales.png',
+            alt: 'Estudiantes desarrollando proyectos digitales'
         },
         {
-            icon: Building2,
             number: '02',
             title: 'Conoce nuestro campus',
             description:
-                'Recorre nuestras instalaciones y descubre dónde construyes tu futuro.'
+                'Explora nuestras instalaciones, laboratorios y espacios de aprendizaje.',
+            image: '/images/campus.JPG',
+            alt: 'Instalaciones del campus Valle Grande'
         },
         {
-            icon: Gamepad2,
             number: '03',
             title: 'Juegos y experiencias',
             description:
-                'Participa en actividades interactivas y vive la tecnología.'
+                'Participa en dinámicas, juegos y actividades interactivas para descubrir la tecnología.',
+            image: '/images/juegos-experiencias.png',
+            alt: 'Estudiantes participando en actividades interactivas'
         }
     ];
 
@@ -37,7 +34,9 @@ function AboutEvent() {
             <div className="container">
 
                 <div className="about-heading">
-                    <span className="about-label">DESCUBRE Y EXPERIMENTA</span>
+                    <span className="about-label">
+                        DESCUBRE Y EXPERIMENTA
+                    </span>
 
                     <h2>
                         ¿Qué encontrarás en nuestro
@@ -45,47 +44,41 @@ function AboutEvent() {
                     </h2>
 
                     <p>
-                        Prepárate para conocer, explorar y disfrutar de
-                        experiencias pensadas para ti.
+                        Prepárate para conocer, explorar y disfrutar
+                        de experiencias pensadas para ti.
                     </p>
                 </div>
 
-                <div className="row align-items-center g-5">
-                    <div className="col-lg-7">
-                        <div className="about-image-wrapper">
-                            <img
-                                src="/images/hero.jpg"
-                                alt="Estudiantes de Valle Grande"
-                                className="about-image"
-                            />
+                <div className="row g-4">
+                    {experiences.map((item) => (
+                        <div
+                            className="col-lg-4 col-md-6"
+                            key={item.number}
+                        >
+                            <article className="experience-card">
+
+                                <div className="experience-image-wrapper">
+                                    <img
+                                        src={item.image}
+                                        alt={item.alt}
+                                        className="experience-image"
+                                    />
+
+                                    <span className="experience-number">
+                                        {item.number}
+                                    </span>
+                                </div>
+
+                                <div className="experience-content">
+                                    <h3>{item.title}</h3>
+                                    <p>{item.description}</p>
+                                </div>
+
+                            </article>
                         </div>
-                    </div>
-                    <div className="col-lg-5">
-                        <div className="experience-list">
-                            {experiences.map((item) => {
-                                const Icon = item.icon;
-
-                                return (
-                                    <article className="experience-item" key={item.number}>
-                                        <span className="experience-number">
-                                            {item.number}
-                                        </span>
-
-                                        <div className="experience-icon">
-                                            <Icon size={25} />
-                                        </div>
-
-                                        <div className="experience-content">
-                                            <h3>{item.title}</h3>
-                                            <p>{item.description}</p>
-                                        </div>
-                                    </article>
-                                );
-                            })}
-                        </div>
-                    </div>
-
+                    ))}
                 </div>
+
             </div>
         </section>
     );

@@ -4,7 +4,6 @@ import Footer from '../components/layout/Footer';
 import VGBot from '../components/layout/VGBot';
 
 import Hero from '../components/sections/Hero';
-import Countdown from '../components/sections/Countdown';
 import AboutEvent from '../components/sections/AboutEvent';
 import EventDetails from '../components/sections/EventDetails';
 import MapSection from '../components/sections/MapSection';
@@ -18,7 +17,6 @@ function Home() {
 
             <main>
                 <Hero />
-                <Countdown />
                 <AboutEvent />
                 <EventDetails />
                 <RegistrationForm />

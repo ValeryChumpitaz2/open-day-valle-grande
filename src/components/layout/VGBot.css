@@ -1,487 +1,423 @@
 
-/* =========================================
-   VG BOT - ASISTENTE VIRTUAL
-========================================= */
+/* CONTENEDOR */
 
 .vg-bot-container {
   position: fixed;
-  right: 28px;
-  bottom: 25px;
+  right: 24px;
+  bottom: 24px;
   z-index: 9999;
   font-family: inherit;
 }
 
-/* =========================================
-   BOTÓN FLOTANTE
-========================================= */
+/* BOTÓN FLOTANTE */
 
 .vg-bot-trigger {
   position: relative;
-  width: 66px;
-  height: 66px;
-  border: 3px solid #ffffff;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #0877e8, #0046a8);
-  color: #ffffff;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  border-radius: 17px;
+  background: #075bb8;
+  color: white;
   cursor: pointer;
-  box-shadow: 0 8px 28px rgba(0, 70, 168, 0.32);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 5px 20px rgba(7, 91, 184, .25);
+  transition: .2s ease;
 }
 
 .vg-bot-trigger:hover {
-  transform: translateY(-4px) scale(1.04);
-  box-shadow: 0 12px 32px rgba(0, 70, 168, 0.4);
+  transform: translateY(-3px);
+  background: #064b99;
 }
 
-.vg-bot-trigger.active {
-  background: #073c83;
-}
-
-.vg-bot-notification {
+.vg-bot-online {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 13px;
-  height: 13px;
-  background: #20d69b;
-  border: 2px solid #ffffff;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid white;
   border-radius: 50%;
+  background: #25c58a;
 }
 
-/* =========================================
-   VENTANA DEL CHAT
-========================================= */
+/* VENTANA */
 
 .vg-chat-window {
   position: absolute;
   right: 0;
-  bottom: 84px;
-  width: 370px;
-  height: 560px;
-  max-height: calc(100vh - 130px);
-  background: #ffffff;
-  border: 1px solid #e6edf6;
-  border-radius: 22px;
-  overflow: hidden;
+  bottom: 70px;
+  width: 350px;
+  height: 510px;
+  max-height: calc(100dvh - 110px);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 18px 60px rgba(12, 43, 86, 0.2);
-  animation: vg-chat-appear 0.25s ease;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 17px;
+  box-shadow: 0 12px 45px rgba(25, 48, 78, .16);
+  animation: vg-appear .2s ease;
 }
 
-@keyframes vg-chat-appear {
+@keyframes vg-appear {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.97);
+    transform: translateY(8px);
   }
-
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-/* =========================================
-   ENCABEZADO
-========================================= */
+/* ENCABEZADO */
 
 .vg-chat-header {
-  min-height: 83px;
-  padding: 17px 19px;
+  min-height: 69px;
+  padding: 12px 15px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: linear-gradient(115deg, #0868ce, #00449d);
-  color: #ffffff;
+  justify-content: space-between;
+  border-bottom: 1px solid #edf0f4;
+  background: #fff;
+}
+
+.vg-chat-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .vg-chat-avatar {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
-  color: #0754b3;
-  background: #ffffff;
+  border-radius: 12px;
+  color: #075bb8;
+  background: #edf5ff;
 }
 
-.vg-avatar-status {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 12px;
-  height: 12px;
-  background: #23d69c;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-}
-
-.vg-chat-header-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.vg-chat-header-info h3 {
+.vg-chat-brand h3 {
   margin: 0 0 4px;
-  font-size: 17px;
-  font-weight: 750;
-  color: #ffffff;
+  color: #1d3552;
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.vg-chat-header-info span {
+.vg-chat-brand p {
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
+  color: #8290a2;
+  font-size: 10px;
 }
 
-.vg-chat-header-info span i {
+.vg-status-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #29e5a6;
+  background: #20bd83;
 }
 
 .vg-chat-close {
-  width: 35px;
-  height: 35px;
-  border: 0;
-  border-radius: 10px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.13);
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #8793a3;
   cursor: pointer;
-  transition: background 0.2s ease;
 }
 
 .vg-chat-close:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: #f2f5f8;
+  color: #344c68;
 }
 
-/* =========================================
-   CUERPO Y MENSAJES
-========================================= */
+/* MENSAJES */
 
 .vg-chat-messages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 15px;
-  background: #f7f9fc;
+  padding: 15px;
+  background: #fff;
   scroll-behavior: smooth;
 }
 
 .vg-chat-messages::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .vg-chat-messages::-webkit-scrollbar-thumb {
-  background: #d4dfed;
+  background: #dfe6ef;
   border-radius: 10px;
 }
 
 .vg-chat-date {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 18px;
-}
-
-.vg-chat-date span {
-  padding: 6px 12px;
+  width: fit-content;
+  margin: 0 auto 20px;
+  padding: 5px 10px;
   border-radius: 20px;
-  background: #eaf2fc;
-  color: #53749d;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.8px;
+  background: #f3f6fa;
+  color: #8a98a9;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 
-.vg-message-row {
+.vg-message {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  margin-bottom: 15px;
+  margin-bottom: 14px;
 }
 
 .vg-message-user {
   justify-content: flex-end;
 }
 
-.vg-message-assistant {
+.vg-message-bot {
   justify-content: flex-start;
 }
 
 .vg-message-avatar {
-  width: 29px;
-  height: 29px;
+  width: 27px;
+  height: 27px;
   flex-shrink: 0;
-  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
-  background: #0965ca;
+  border-radius: 9px;
+  background: #edf5ff;
+  color: #075bb8;
 }
 
-.vg-message-bubble {
+.vg-message-content {
   max-width: 83%;
-  padding: 12px 14px;
-  border-radius: 15px;
-  font-size: 13px;
-  line-height: 1.55;
+  padding: 11px 13px;
+  border-radius: 13px;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-.vg-message-assistant .vg-message-bubble {
-  color: #263c5b;
-  background: #ffffff;
-  border: 1px solid #e8edf4;
-  border-bottom-left-radius: 5px;
+.vg-message-bot .vg-message-content {
+  border: 1px solid #edf0f4;
+  border-bottom-left-radius: 4px;
+  background: #f8fafc;
+  color: #34475e;
 }
 
-.vg-message-user .vg-message-bubble {
-  color: #ffffff;
-  background: linear-gradient(135deg, #0874df, #0752b5);
-  border-bottom-right-radius: 5px;
+.vg-message-user .vg-message-content {
+  border-bottom-right-radius: 4px;
+  background: #075bb8;
+  color: #fff;
 }
 
-/* =========================================
-   PREGUNTAS FRECUENTES
-========================================= */
+/* SUGERENCIAS */
 
-.vg-quick-questions {
-  margin: 19px 0 10px 37px;
+.vg-suggestions {
+  margin: 18px 0 8px 35px;
 }
 
-.vg-quick-questions p {
-  margin: 0 0 10px;
-  color: #72839a;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.vg-quick-questions button {
-  width: 100%;
-  min-height: 39px;
-  padding: 9px 11px;
-  margin-bottom: 8px;
-  border: 1px solid #cbdcf2;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  text-align: left;
-  color: #0754ad;
-  background: #ffffff;
-  font-size: 12px;
+.vg-suggestions p {
+  margin: 0 0 9px;
+  color: #8996a7;
+  font-size: 10px;
   font-weight: 600;
+}
+
+.vg-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.vg-suggestions-list button {
+  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e4ebf3;
+  border-radius: 8px;
+  background: #fff;
+  color: #426486;
+  font-family: inherit;
+  font-size: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: .2s ease;
 }
 
-.vg-quick-questions button:hover {
-  color: #ffffff;
-  background: #075cbe;
-  border-color: #075cbe;
-  transform: translateX(3px);
+.vg-suggestions-list button:hover {
+  border-color: #a9c9ed;
+  background: #f1f7ff;
+  color: #075bb8;
 }
 
-/* =========================================
-   INDICADOR DE ESCRITURA
-========================================= */
+/* ESCRIBIENDO */
 
 .vg-typing {
-  height: 37px;
-  padding: 0 13px;
-  border: 1px solid #e8edf4;
-  border-radius: 13px;
-  background: #ffffff;
+  height: 34px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   gap: 4px;
+  border: 1px solid #edf0f4;
+  border-radius: 12px;
+  background: #f8fafc;
 }
 
 .vg-typing span {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: #6f91bb;
-  animation: vg-typing-animation 1s infinite ease-in-out;
+  background: #8ba6c4;
+  animation: vg-dots 1s infinite ease-in-out;
 }
 
 .vg-typing span:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: .15s;
 }
 
 .vg-typing span:nth-child(3) {
-  animation-delay: 0.3s;
+  animation-delay: .3s;
 }
 
-@keyframes vg-typing-animation {
+@keyframes vg-dots {
   0%, 60%, 100% {
-    opacity: 0.4;
+    opacity: .4;
     transform: translateY(0);
   }
-
   30% {
     opacity: 1;
     transform: translateY(-4px);
   }
 }
 
-/* =========================================
-   ACCIÓN DE INSCRIPCIÓN
-========================================= */
+/* INSCRIPCIÓN */
 
-.vg-chat-action {
-  padding: 10px 15px 0;
-  background: #ffffff;
+.vg-chat-register {
+  padding: 7px 14px 0;
+  background: #fff;
 }
 
-.vg-chat-action button {
-  width: 100%;
-  min-height: 39px;
-  border: 0;
-  border-radius: 10px;
-  background: #eaf3ff;
-  color: #0756b3;
+.vg-chat-register button {
+  padding: 7px 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #647e9b;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
 }
 
-.vg-chat-action button:hover {
-  background: #d9eaff;
+.vg-chat-register button:hover {
+  color: #075bb8;
 }
 
-/* =========================================
-   CAMPO DE MENSAJE
-========================================= */
+/* CAMPO DE MENSAJE */
 
-.vg-chat-input-area {
+.vg-chat-input {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 12px 15px;
-  background: #ffffff;
+  padding: 10px 13px;
+  background: #fff;
 }
 
-.vg-chat-input-area input {
+.vg-chat-input input {
   flex: 1;
   min-width: 0;
-  height: 43px;
+  height: 41px;
   padding: 0 14px;
-  border: 1px solid #dce5f0;
-  border-radius: 25px;
+  border: 1px solid #e5eaf0;
+  border-radius: 22px;
   outline: none;
-  background: #f9fbfe;
-  color: #203754;
+  background: #f8fafc;
+  color: #273e59;
   font-family: inherit;
   font-size: 12px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.vg-chat-input-area input:focus {
-  border-color: #0b6bd2;
-  box-shadow: 0 0 0 3px rgba(11, 107, 210, 0.09);
+.vg-chat-input input:focus {
+  border-color: #8db9e8;
+  background: #fff;
 }
 
-.vg-chat-input-area input::placeholder {
-  color: #98a7ba;
+.vg-chat-input input::placeholder {
+  color: #9ba7b6;
 }
 
-.vg-chat-input-area button {
-  width: 43px;
-  height: 43px;
+.vg-chat-input button {
+  width: 39px;
+  height: 39px;
   flex-shrink: 0;
-  border: 0;
-  border-radius: 50%;
-  background: #075cc0;
-  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: #075bb8;
+  color: #fff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: .2s ease;
 }
 
-.vg-chat-input-area button:hover:not(:disabled) {
-  background: #034594;
-  transform: scale(1.05);
+.vg-chat-input button:hover:not(:disabled) {
+  background: #064b99;
 }
 
-.vg-chat-input-area button:disabled {
-  opacity: 0.45;
+.vg-chat-input button:disabled {
+  opacity: .4;
   cursor: not-allowed;
 }
 
-/* =========================================
-   PIE DEL CHAT
-========================================= */
+/* PIE */
 
 .vg-chat-footer {
-  min-height: 29px;
-  padding: 5px 10px 10px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-  background: #ffffff;
-  color: #9aa8b9;
-  font-size: 10px;
+  padding: 0 10px 10px;
+  text-align: center;
+  background: #fff;
+  color: #a0aaba;
+  font-size: 9px;
 }
 
-/* =========================================
-   RESPONSIVE
-========================================= */
+/* RESPONSIVE */
 
 @media (max-width: 480px) {
   .vg-bot-container {
-    right: 15px;
-    bottom: 15px;
-  }
-
-  .vg-bot-trigger {
-    width: 59px;
-    height: 59px;
+    right: 14px;
+    bottom: 14px;
   }
 
   .vg-chat-window {
     position: fixed;
     right: 10px;
-    bottom: 85px;
+    bottom: 77px;
     width: calc(100vw - 20px);
-    max-width: 390px;
-    height: min(570px, calc(100dvh - 110px));
+    height: min(530px, calc(100dvh - 100px));
     max-height: none;
-    border-radius: 19px;
   }
 }
 
-@media (max-width: 350px) {
-  .vg-chat-header {
-    padding: 13px;
-  }
-
-  .vg-chat-messages {
-    padding: 13px 10px;
-  }
-
-  .vg-message-bubble {
-    font-size: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .vg-chat-window,
+  .vg-typing span {
+    animation: none;
   }
 }
