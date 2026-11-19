@@ -3,30 +3,70 @@
 ob_start();
 
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Access-Control-Allow-Credentials: true");
+header("Vary: Origin");
 
-// Configuración de la sesión
-session_set_cookie_params([
-    "lifetime" => 0,
-    "path" => "/",
-    "secure" => false,
-    "httponly" => true,
-    "samesite" => "Lax"
-]);
+// =====================================================
+// CONFIGURACIÓN CORS
+// =====================================================
 
-session_start();
+// Dominios autorizados desde Railway
+$frontends = getenv("FRONTEND_URLS") ?: "http://localhost:5173";
 
-// Responder solicitudes OPTIONS
+$origenesPermitidos = array_filter(
+    array_map("trim", explode(",", $frontends))
+);
+
+$origen = $_SERVER["HTTP_ORIGIN"] ?? "";
+
+if ($origen !== "" && in_array($origen, $origenesPermitidos, true)) {
+
+    header("Access-Control-Allow-Origin: " . $origen);
+    header("Access-Control-Allow-Credentials: true");
+    header("Access-Control-Allow-Methods: POST, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization");
+    header("Access-Control-Max-Age: 86400");
+
+} elseif ($origen !== "") {
+
+    http_response_code(403);
+    ob_end_clean();
+
+    echo json_encode([
+        "success" => false,
+        "message" => "Origen no autorizado."
+    ], JSON_UNESCAPED_UNICODE);
+
+    exit;
+}
+
+// =====================================================
+// RESPUESTA A SOLICITUDES OPTIONS
+// =====================================================
+
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
     ob_end_clean();
     exit;
 }
 
-// Función para responder JSON
+// =====================================================
+// CONFIGURACIÓN DE SESIÓN HTTPS
+// =====================================================
+
+session_set_cookie_params([
+    "lifetime" => 0,
+    "path" => "/",
+    "secure" => true,
+    "httponly" => true,
+    "samesite" => "None"
+]);
+
+session_start();
+
+// =====================================================
+// FUNCIÓN PARA RESPONDER JSON
+// =====================================================
+
 function responder($codigo, $datos)
 {
     http_response_code($codigo);
@@ -39,7 +79,10 @@ function responder($codigo, $datos)
     exit;
 }
 
-// Solo permitir POST
+// =====================================================
+// VALIDAR MÉTODO
+// =====================================================
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     responder(405, [
         "success" => false,
@@ -51,7 +94,7 @@ require_once __DIR__ . "/config/database.php";
 
 try {
 
-    // Recibir información enviada desde React
+    // Recibir información desde React
     $datos = json_decode(file_get_contents("php://input"), true);
 
     if (!is_array($datos)) {
