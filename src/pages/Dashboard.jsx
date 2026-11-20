@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   LayoutDashboard,
   ClipboardList,
@@ -27,6 +28,7 @@ import {
   Phone,
   Building2,
   FileSpreadsheet,
+  Trash2,
 } from "lucide-react";
 
 import API_URL from "../config/api";
@@ -58,8 +60,7 @@ const normalizarTexto = (valor) =>
 const formatearFecha = (fecha) => {
   if (!fecha) return "Sin fecha";
 
-  const valor = String(fecha).replace(" ", "T");
-  const date = new Date(valor);
+  const date = new Date(String(fecha).replace(" ", "T"));
 
   if (Number.isNaN(date.getTime())) return fecha;
 
@@ -83,14 +84,13 @@ const formatearFechaCompleta = (fecha) => {
   });
 };
 
-const obtenerIniciales = (nombre) => {
-  return String(nombre || "Visitante")
+const obtenerIniciales = (nombre) =>
+  String(nombre || "Visitante")
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map((parte) => parte.charAt(0).toUpperCase())
     .join("");
-};
 
 const claseEstado = (estado) => {
   const normalizado = normalizarTexto(estado);
@@ -114,15 +114,9 @@ async function leerRespuesta(response) {
     );
   }
 
-  if (!response.ok) {
+  if (!response.ok || resultado.success === false) {
     throw new Error(
       resultado.mensaje || `Error del servidor (${response.status}).`
-    );
-  }
-
-  if (resultado.success === false) {
-    throw new Error(
-      resultado.mensaje || "No se pudo completar la solicitud."
     );
   }
 
@@ -136,6 +130,8 @@ function Dashboard() {
 
   const [cargando, setCargando] = useState(true);
   const [actualizando, setActualizando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState(null);
+
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -150,7 +146,7 @@ function Dashboard() {
   const [menuMovil, setMenuMovil] = useState(false);
 
   // =====================================================
-  // CARGAR INFORMACIÓN DEL DASHBOARD
+  // CARGAR INFORMACIÓN
   // =====================================================
 
   const cargarDatos = useCallback(async (mostrarCarga = true) => {
@@ -297,6 +293,12 @@ function Dashboard() {
     setPagina(1);
   }, [busqueda, filtroEstado, filtroTipo]);
 
+  useEffect(() => {
+    if (pagina > totalPaginas) {
+      setPagina(totalPaginas);
+    }
+  }, [pagina, totalPaginas]);
+
   // =====================================================
   // ACTUALIZAR ESTADO
   // =====================================================
@@ -349,6 +351,62 @@ function Dashboard() {
       setError(err.message || "No se pudo actualizar el estado.");
     } finally {
       setActualizando(false);
+    }
+  };
+
+  // =====================================================
+  // ELIMINAR INSCRIPCIÓN
+  // =====================================================
+
+  const eliminarInscripcion = async (id, nombre) => {
+    if (!id || eliminandoId !== null) return;
+
+    const confirmar = window.confirm(
+      `¿Deseas eliminar la inscripción de "${nombre || "este visitante"}"?\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmar) return;
+
+    setEliminandoId(id);
+    setError("");
+    setMensaje("");
+
+    try {
+      const response = await fetch(
+        obtenerUrl("eliminar_inscripcion.php"),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ id }),
+        }
+      );
+
+      const resultado = await leerRespuesta(response);
+
+      setInscripciones((actuales) =>
+        actuales.filter(
+          (item) => Number(item.id) !== Number(id)
+        )
+      );
+
+      setInscripcionSeleccionada((actual) =>
+        actual && Number(actual.id) === Number(id)
+          ? null
+          : actual
+      );
+
+      setMensaje(
+        resultado.mensaje || "Inscripción eliminada correctamente."
+      );
+    } catch (err) {
+      console.error("Error al eliminar inscripción:", err);
+      setError(err.message || "No se pudo eliminar la inscripción.");
+    } finally {
+      setEliminandoId(null);
     }
   };
 
@@ -504,9 +562,7 @@ function Dashboard() {
             </span>
           </div>
           <strong className="stat-card-value">{estadisticas.total}</strong>
-          <span className="stat-card-description">
-            Registros recibidos
-          </span>
+          <span className="stat-card-description">Registros recibidos</span>
         </article>
 
         <article className="stat-card">
@@ -519,9 +575,7 @@ function Dashboard() {
           <strong className="stat-card-value">
             {estadisticas.pendientes}
           </strong>
-          <span className="stat-card-description">
-            Por confirmar
-          </span>
+          <span className="stat-card-description">Por confirmar</span>
         </article>
 
         <article className="stat-card">
@@ -617,7 +671,9 @@ function Dashboard() {
                       className="report-progress-bar"
                       style={{
                         width: `${
-                          (item.cantidad / estadisticas.total) * 100
+                          estadisticas.total
+                            ? (item.cantidad / estadisticas.total) * 100
+                            : 0
                         }%`,
                       }}
                     />
@@ -677,6 +733,10 @@ function Dashboard() {
     </>
   );
 
+  // =====================================================
+  // INSCRIPCIONES
+  // =====================================================
+
   const renderInscripciones = () => (
     <>
       <section className="dashboard-welcome">
@@ -700,9 +760,7 @@ function Dashboard() {
         <div className="registrations-header">
           <div>
             <h2>Listado de visitantes</h2>
-            <p>
-              {inscripcionesFiltradas.length} registros encontrados
-            </p>
+            <p>{inscripcionesFiltradas.length} registros encontrados</p>
           </div>
         </div>
 
@@ -798,13 +856,35 @@ function Dashboard() {
                     </td>
 
                     <td>
-                      <button
-                        className="action-button"
-                        title="Ver detalles"
-                        onClick={() => setInscripcionSeleccionada(item)}
-                      >
-                        <Eye size={17} />
-                      </button>
+                      <div className="table-actions">
+                        <button
+                          className="action-button"
+                          title="Ver detalles"
+                          onClick={() =>
+                            setInscripcionSeleccionada(item)
+                          }
+                        >
+                          <Eye size={17} />
+                        </button>
+
+                        <button
+                          className="action-button delete-action"
+                          title="Eliminar inscripción"
+                          disabled={eliminandoId !== null}
+                          onClick={() =>
+                            eliminarInscripcion(item.id, item.nombre)
+                          }
+                        >
+                          {Number(eliminandoId) === Number(item.id) ? (
+                            <RefreshCw
+                              size={17}
+                              className="refresh-spinning"
+                            />
+                          ) : (
+                            <Trash2 size={17} />
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -850,6 +930,10 @@ function Dashboard() {
     </>
   );
 
+  // =====================================================
+  // REPORTES
+  // =====================================================
+
   const renderReportes = () => (
     <>
       <section className="dashboard-welcome">
@@ -888,7 +972,9 @@ function Dashboard() {
                       className="report-progress-bar"
                       style={{
                         width: `${
-                          (item.cantidad / estadisticas.total) * 100
+                          estadisticas.total
+                            ? (item.cantidad / estadisticas.total) * 100
+                            : 0
                         }%`,
                       }}
                     />
@@ -960,6 +1046,10 @@ function Dashboard() {
       </section>
     </>
   );
+
+  // =====================================================
+  // CONFIGURACIÓN
+  // =====================================================
 
   const renderConfiguracion = () => (
     <>
@@ -1159,7 +1249,9 @@ function Dashboard() {
         </div>
       </main>
 
-      {/* MODAL DE DETALLES */}
+      {/* =====================================================
+          MODAL DE DETALLES
+      ===================================================== */}
 
       {inscripcionSeleccionada && (
         <div
@@ -1193,8 +1285,7 @@ function Dashboard() {
                 <div>
                   <h3>{inscripcionSeleccionada.nombre}</h3>
                   <span>
-                    {inscripcionSeleccionada.tipo_visitante ||
-                      "Visitante"}
+                    {inscripcionSeleccionada.tipo_visitante || "Visitante"}
                   </span>
                 </div>
               </div>
@@ -1296,6 +1387,20 @@ function Dashboard() {
                   ))}
                 </select>
               </div>
+
+              <button
+                className="modal-delete-button"
+                disabled={eliminandoId !== null}
+                onClick={() =>
+                  eliminarInscripcion(
+                    inscripcionSeleccionada.id,
+                    inscripcionSeleccionada.nombre
+                  )
+                }
+              >
+                <Trash2 size={17} />
+                Eliminar inscripción
+              </button>
             </div>
 
             <div className="modal-footer">
