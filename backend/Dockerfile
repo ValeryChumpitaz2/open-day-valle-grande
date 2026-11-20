@@ -16,7 +16,11 @@ WORKDIR /var/www/html
 
 # Copiar los archivos del backend
 COPY . /var/www/html/
-
+# DIAGNÓSTICO DEL ARCHIVO PHP
+RUN echo "===== PRIMEROS BYTES DE DASHBOARD.PHP =====" \
+    && od -An -tx1 -N16 /var/www/html/dashboard.php \
+    && echo "===== SINTAXIS PHP =====" \
+    && php -l /var/www/html/dashboard.php
 # NUEVO: eliminar BOM de todos los archivos PHP
 RUN find /var/www/html -type f -name "*.php" \
     -exec sed -i '1s/^\xEF\xBB\xBF//' {} +
