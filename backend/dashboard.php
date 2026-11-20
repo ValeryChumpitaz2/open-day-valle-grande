@@ -3,7 +3,7 @@
 ob_start();
 
 /* =====================================================
-   CONFIGURACIÓN GENERAL Y CORS
+   CONFIGURACIÓN GENERAL
 ===================================================== */
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -12,16 +12,15 @@ header("Cache-Control: no-store, no-cache, must-revalidate");
 
 $origin = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-// Orígenes permitidos.
-// En Railway configura FRONTEND_URLS con los dominios separados por comas.
 $allowedOrigins = [
     "http://localhost:5173",
     "https://openday.vallegrande.edu.pe"
 ];
 
+// Orígenes adicionales configurados en Railway.
 $frontendUrls = getenv("FRONTEND_URLS") ?: "";
 
-if (!empty($frontendUrls)) {
+if ($frontendUrls !== "") {
     $additionalOrigins = array_map(
         "trim",
         explode(",", $frontendUrls)
@@ -44,7 +43,7 @@ header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 /* =====================================================
-   SOLICITUDES PREFLIGHT
+   RESPUESTAS PREFLIGHT
 ===================================================== */
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
@@ -53,22 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 /* =====================================================
-   CONFIGURACIÓN DE SESIÓN
-===================================================== */
-
-// Debe coincidir con la configuración de login.php.
-session_set_cookie_params([
-    "lifetime" => 0,
-    "path" => "/",
-    "secure" => true,
-    "httponly" => true,
-    "samesite" => "None"
-]);
-
-session_start();
-
-/* =====================================================
-   FUNCIÓN PARA RESPONDER JSON
+   FUNCIÓN DE RESPUESTA JSON
 ===================================================== */
 
 function responder($codigo, $datos)
@@ -88,7 +72,7 @@ function responder($codigo, $datos)
 }
 
 /* =====================================================
-   VALIDAR MÉTODO HTTP
+   VALIDAR MÉTODO
 ===================================================== */
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
@@ -99,7 +83,22 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET") {
 }
 
 /* =====================================================
-   VALIDAR SESIÓN DEL ADMINISTRADOR
+   CONFIGURACIÓN DE SESIÓN
+   DEBE COINCIDIR CON login.php
+===================================================== */
+
+session_set_cookie_params([
+    "lifetime" => 0,
+    "path" => "/",
+    "secure" => true,
+    "httponly" => true,
+    "samesite" => "None"
+]);
+
+session_start();
+
+/* =====================================================
+   VALIDAR SESIÓN
 ===================================================== */
 
 if (!isset($_SESSION["administrador"])) {
@@ -110,7 +109,7 @@ if (!isset($_SESSION["administrador"])) {
 }
 
 /* =====================================================
-   CONEXIÓN Y CONSULTAS
+   CONEXIÓN A LA BASE DE DATOS
 ===================================================== */
 
 try {
@@ -121,7 +120,9 @@ try {
     $connection = $database->connect();
 
     if (!$connection) {
-        throw new Exception("No se pudo establecer la conexión con la base de datos.");
+        throw new Exception(
+            "No se pudo establecer la conexión con la base de datos."
+        );
     }
 
     /* =============================================
@@ -240,21 +241,22 @@ try {
         "success" => true,
         "estadisticas" => $estadisticasFinales,
         "inscripciones" => $inscripciones,
+
         "reportes" => [
             "por_tipo" => $porTipo,
             "por_distrito" => $porDistrito,
             "por_dia" => $porDia
         ],
 
-        // Se incluyen ambas propiedades para compatibilidad
-        // con las versiones del Dashboard.jsx.
         "administrador" => $_SESSION["administrador"],
         "admin" => $_SESSION["administrador"]
     ]);
 
 } catch (Throwable $e) {
 
-    error_log("Error en dashboard.php: " . $e->getMessage());
+    error_log(
+        "Error en dashboard.php: " . $e->getMessage()
+    );
 
     responder(500, [
         "success" => false,
