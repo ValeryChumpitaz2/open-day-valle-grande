@@ -1,4 +1,3 @@
-
 FROM php:8.3-apache
 
 # Instalar extensiones necesarias para MySQL
@@ -15,7 +14,11 @@ RUN find /etc/apache2/mods-enabled -maxdepth 1 \
 
 WORKDIR /var/www/html
 
-# Copiar los archivos del backend al contenedor
+# Copiar los archivos del backend
 COPY . /var/www/html/
+
+# NUEVO: eliminar BOM de todos los archivos PHP
+RUN find /var/www/html -type f -name "*.php" \
+    -exec sed -i '1s/^\xEF\xBB\xBF//' {} +
 
 EXPOSE 80
