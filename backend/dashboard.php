@@ -12,45 +12,43 @@ header("Cache-Control: no-store, no-cache, must-revalidate");
 
 $origin = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-$allowedOrigins = [
+// CONFIGURACIÓN CORS
+$origenesPermitidos = [
     "http://localhost:5173",
     "https://openday.vallegrande.edu.pe"
 ];
 
-// Orígenes adicionales configurados en Railway.
-$frontendUrls = getenv("FRONTEND_URLS") ?: "";
+// Leer dominios adicionales desde Railway
+$frontends = getenv("FRONTEND_URLS");
 
-if ($frontendUrls !== "") {
-    $additionalOrigins = array_map(
-        "trim",
-        explode(",", $frontendUrls)
-    );
+if ($frontends) {
+    $adicionales = explode(",", $frontends);
 
-    $allowedOrigins = array_merge(
-        $allowedOrigins,
-        $additionalOrigins
-    );
+    foreach ($adicionales as $url) {
+        $url = trim($url);
+
+        if (!empty($url)) {
+            $origenesPermitidos[] = $url;
+        }
+    }
 }
 
-$allowedOrigins = array_unique($allowedOrigins);
+$origen = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-if ($origin !== "" && in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: " . $origin);
+header("Vary: Origin");
+
+if (in_array($origen, $origenesPermitidos, true)) {
+    header("Access-Control-Allow-Origin: " . $origen);
     header("Access-Control-Allow-Credentials: true");
 }
 
 header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-/* =====================================================
-   RESPUESTAS PREFLIGHT
-===================================================== */
+header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
     exit;
 }
-
 /* =====================================================
    FUNCIÓN DE RESPUESTA JSON
 ===================================================== */
