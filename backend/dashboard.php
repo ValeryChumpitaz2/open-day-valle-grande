@@ -2,6 +2,10 @@
 
 ob_start();
 
+ini_set("display_errors", "0");
+ini_set("log_errors", "1");
+error_reporting(E_ALL);
+
 header("Content-Type: application/json; charset=UTF-8");
 header("Vary: Origin");
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
@@ -12,39 +16,22 @@ header("Expires: 0");
 // 1. CONFIGURACIÓN CORS
 // ======================================================
 
-$origenesPermitidos = [
-    "https://openday.vallegrande.edu.pe",
-    "http://localhost:5173"
-];
+$frontends = getenv("FRONTEND_URLS")
+    ?: "https://openday.vallegrande.edu.pe,http://localhost:5173";
 
-$origenesConfigurados = getenv("FRONTEND_URLS")
-    ?: ($_ENV["FRONTEND_URLS"] ?? $_SERVER["FRONTEND_URLS"] ?? "");
-
-if (!empty($origenesConfigurados)) {
-    $origenesExtra = array_map(
-        "trim",
-        explode(",", $origenesConfigurados)
-    );
-
-    $origenesPermitidos = array_merge(
-        $origenesPermitidos,
-        $origenesExtra
-    );
-}
-
-$origenesPermitidos = array_unique(
-    array_filter($origenesPermitidos)
+$origenesPermitidos = array_filter(
+    array_map("trim", explode(",", $frontends))
 );
 
 $origen = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-if (in_array($origen, $origenesPermitidos, true)) {
+if ($origen !== "" && in_array($origen, $origenesPermitidos, true)) {
     header("Access-Control-Allow-Origin: " . $origen);
     header("Access-Control-Allow-Credentials: true");
 }
 
 header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Headers: Content-Type, Accept, Authorization");
 
 // ======================================================
 // 2. FUNCIÓN DE RESPUESTA JSON
@@ -54,7 +41,7 @@ function responder($codigo, $datos)
 {
     http_response_code($codigo);
 
-    if (ob_get_length() !== false) {
+    if (ob_get_level() > 0 && ob_get_length() !== false) {
         ob_clean();
     }
 
@@ -69,15 +56,7 @@ function responder($codigo, $datos)
 }
 
 // ======================================================
-// 3. CONTROL DE ERRORES
-// ======================================================
-
-ini_set("display_errors", "0");
-ini_set("log_errors", "1");
-error_reporting(E_ALL);
-
-// ======================================================
-// 4. VALIDAR MÉTODO HTTP
+// 3. VALIDAR MÉTODO HTTP
 // ======================================================
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
@@ -93,7 +72,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET") {
 }
 
 // ======================================================
-// 5. CONFIGURACIÓN DE SESIÓN
+// 4. CONFIGURACIÓN DE SESIÓN
 // ======================================================
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -110,14 +89,17 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // ======================================================
-// 6. VALIDAR ADMINISTRADOR
+// 5. VALIDAR SESIÓN ADMINISTRATIVA
 // ======================================================
 
 $administrador = $_SESSION["administrador"]
     ?? $_SESSION["admin"]
     ?? null;
 
-if (empty($administrador)) {
+if (
+    !is_array($administrador) ||
+    empty($administrador["id"])
+) {
     responder(401, [
         "success" => false,
         "mensaje" => "Sesión no válida. Inicia sesión nuevamente."
@@ -125,7 +107,7 @@ if (empty($administrador)) {
 }
 
 // ======================================================
-// 7. CONEXIÓN A BASE DE DATOS
+// 6. CONEXIÓN A BASE DE DATOS
 // ======================================================
 
 try {
@@ -136,9 +118,7 @@ try {
     $conexion = $database->connect();
 
     if (!$conexion instanceof PDO) {
-        throw new Exception(
-            "La conexión a la base de datos no es válida."
-        );
+        throw new Exception("Conexión MySQL no válida.");
     }
 
     $conexion->setAttribute(
@@ -152,32 +132,21 @@ try {
     );
 
     // ==================================================
-    // 8. ESTADÍSTICAS GENERALES
+    // 7. ESTADÍSTICAS GENERALES
     // ==================================================
 
     $sqlEstadisticas = "
         SELECT
             COUNT(*) AS total,
-            SUM(CASE
-                WHEN estado = 'Pendiente' THEN 1
-                ELSE 0
-            END) AS pendientes,
-            SUM(CASE
-                WHEN estado = 'Confirmada' THEN 1
-                ELSE 0
-            END) AS confirmadas,
-            SUM(CASE
-                WHEN estado = 'Cancelada' THEN 1
-                ELSE 0
-            END) AS canceladas
+            SUM(CASE WHEN estado = 'Pendiente' THEN 1 ELSE 0 END) AS pendientes,
+            SUM(CASE WHEN estado = 'Confirmada' THEN 1 ELSE 0 END) AS confirmadas,
+            SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) AS canceladas
         FROM inscripciones
     ";
 
-    $consultaEstadisticas = $conexion->query(
-        $sqlEstadisticas
-    );
-
-    $estadisticas = $consultaEstadisticas->fetch();
+    $estadisticas = $conexion
+        ->query($sqlEstadisticas)
+        ->fetch();
 
     $estadisticasFinales = [
         "total" => (int) ($estadisticas["total"] ?? 0),
@@ -187,7 +156,7 @@ try {
     ];
 
     // ==================================================
-    // 9. LISTADO DE INSCRIPCIONES
+    // 8. LISTADO DE INSCRIPCIONES
     // ==================================================
 
     $sqlInscripciones = "
@@ -207,14 +176,12 @@ try {
         ORDER BY fecha_registro DESC
     ";
 
-    $consultaInscripciones = $conexion->query(
-        $sqlInscripciones
-    );
-
-    $inscripciones = $consultaInscripciones->fetchAll();
+    $inscripciones = $conexion
+        ->query($sqlInscripciones)
+        ->fetchAll();
 
     // ==================================================
-    // 10. REPORTE POR TIPO DE VISITANTE
+    // 9. REPORTE POR TIPO
     // ==================================================
 
     $sqlPorTipo = "
@@ -226,12 +193,12 @@ try {
         ORDER BY cantidad DESC
     ";
 
-    $consultaPorTipo = $conexion->query($sqlPorTipo);
-
-    $porTipo = $consultaPorTipo->fetchAll();
+    $porTipo = $conexion
+        ->query($sqlPorTipo)
+        ->fetchAll();
 
     // ==================================================
-    // 11. REPORTE POR DISTRITO
+    // 10. REPORTE POR DISTRITO
     // ==================================================
 
     $sqlPorDistrito = "
@@ -243,12 +210,12 @@ try {
         ORDER BY cantidad DESC
     ";
 
-    $consultaPorDistrito = $conexion->query($sqlPorDistrito);
-
-    $porDistrito = $consultaPorDistrito->fetchAll();
+    $porDistrito = $conexion
+        ->query($sqlPorDistrito)
+        ->fetchAll();
 
     // ==================================================
-    // 12. REPORTE POR DÍA (ÚLTIMOS 7 DÍAS)
+    // 11. REPORTE POR DÍA
     // ==================================================
 
     $sqlPorDia = "
@@ -256,20 +223,17 @@ try {
             DATE(fecha_registro) AS fecha,
             COUNT(*) AS cantidad
         FROM inscripciones
-        WHERE fecha_registro >= DATE_SUB(
-            CURDATE(),
-            INTERVAL 6 DAY
-        )
+        WHERE fecha_registro >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY DATE(fecha_registro)
         ORDER BY fecha ASC
     ";
 
-    $consultaPorDia = $conexion->query($sqlPorDia);
-
-    $porDia = $consultaPorDia->fetchAll();
+    $porDia = $conexion
+        ->query($sqlPorDia)
+        ->fetchAll();
 
     // ==================================================
-    // 13. NORMALIZAR VALORES
+    // 12. NORMALIZAR RESULTADOS
     // ==================================================
 
     foreach ($porTipo as &$fila) {
@@ -288,36 +252,26 @@ try {
     unset($fila);
 
     foreach ($inscripciones as &$fila) {
-
         $fila["id"] = (int) $fila["id"];
-
-        $fila["asistentes"] = (int) (
-            $fila["asistentes"] ?? 0
-        );
+        $fila["asistentes"] = (int) ($fila["asistentes"] ?? 0);
     }
     unset($fila);
 
     // ==================================================
-    // 14. RESPUESTA FINAL
+    // 13. RESPUESTA FINAL
     // ==================================================
 
     responder(200, [
         "success" => true,
-
         "mensaje" => "Dashboard cargado correctamente.",
-
         "estadisticas" => $estadisticasFinales,
-
         "inscripciones" => $inscripciones,
-
         "reportes" => [
             "por_tipo" => $porTipo,
             "por_distrito" => $porDistrito,
             "por_dia" => $porDia
         ],
-
         "administrador" => $administrador,
-
         "admin" => $administrador
     ]);
 
@@ -329,7 +283,6 @@ try {
 
     responder(500, [
         "success" => false,
-        "mensaje" => "Ocurrió un error al cargar el dashboard.",
-        "error" => $error->getMessage()
+        "mensaje" => "Ocurrió un error al cargar el dashboard."
     ]);
 }
