@@ -1618,3 +1618,115 @@
     padding: 16px;
   }
 }
+
+/* =====================================================
+   ACCIONES DE LA TABLA
+===================================================== */
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5eaf2;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #52627a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  background: #edf5ff;
+  border-color: #c5dcfa;
+  color: #1764b0;
+}
+
+.action-button.delete-action {
+  color: #dc4b4b;
+}
+
+.action-button.delete-action:hover {
+  background: #fff0f0;
+  border-color: #f3c2c2;
+  color: #c62828;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   BOTÓN DE ELIMINACIÓN DEL MODAL
+===================================================== */
+
+.modal-delete-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #f2caca;
+  border-radius: 10px;
+  background: #fff7f7;
+  color: #c62828;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-delete-button:hover {
+  background: #feecec;
+  border-color: #e9aaaa;
+}
+
+.modal-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   ANIMACIÓN
+===================================================== */
+
+.refresh-spinning svg,
+.refresh-spinning {
+  animation: dashboard-spin 1s linear infinite;
+}
+
+@keyframes dashboard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 640px) {
+  .table-actions {
+    gap: 5px;
+  }
+
+  .action-button {
+    width: 33px;
+    height: 33px;
+  }
+
+  .modal-delete-button {
+    margin-top: 16px;
+  }
+}
+
