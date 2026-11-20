@@ -4,8 +4,7 @@ ob_start();
 
 header("Content-Type: application/json; charset=UTF-8");
 header("Vary: Origin");
-
-header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
 
@@ -33,6 +32,10 @@ if (!empty($origenesConfigurados)) {
     );
 }
 
+$origenesPermitidos = array_unique(
+    array_filter($origenesPermitidos)
+);
+
 $origen = $_SERVER["HTTP_ORIGIN"] ?? "";
 
 if (in_array($origen, $origenesPermitidos, true)) {
@@ -43,35 +46,44 @@ if (in_array($origen, $origenesPermitidos, true)) {
 header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// Preflight CORS
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    http_response_code(204);
-    exit;
-}
-
 // ======================================================
-// 2. FUNCIÓN PARA RESPONDER JSON
+// 2. FUNCIÓN DE RESPUESTA JSON
 // ======================================================
 
 function responder($codigo, $datos)
 {
     http_response_code($codigo);
 
-    if (ob_get_length()) {
+    if (ob_get_length() !== false) {
         ob_clean();
     }
 
     echo json_encode(
         $datos,
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        JSON_UNESCAPED_UNICODE |
+        JSON_UNESCAPED_SLASHES |
+        JSON_INVALID_UTF8_SUBSTITUTE
     );
 
     exit;
 }
 
 // ======================================================
-// 3. MÉTODO PERMITIDO
+// 3. CONTROL DE ERRORES
 // ======================================================
+
+ini_set("display_errors", "0");
+ini_set("log_errors", "1");
+error_reporting(E_ALL);
+
+// ======================================================
+// 4. VALIDAR MÉTODO HTTP
+// ======================================================
+
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    http_response_code(204);
+    exit;
+}
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
     responder(405, [
@@ -81,28 +93,31 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET") {
 }
 
 // ======================================================
-// 4. CONFIGURACIÓN DE SESIÓN
+// 5. CONFIGURACIÓN DE SESIÓN
 // ======================================================
 
-session_set_cookie_params([
-    "lifetime" => 0,
-    "path" => "/",
-    "secure" => true,
-    "httponly" => true,
-    "samesite" => "None"
-]);
+if (session_status() === PHP_SESSION_NONE) {
 
-session_start();
+    session_set_cookie_params([
+        "lifetime" => 0,
+        "path" => "/",
+        "secure" => true,
+        "httponly" => true,
+        "samesite" => "None"
+    ]);
+
+    session_start();
+}
 
 // ======================================================
-// 5. VALIDAR ADMINISTRADOR
+// 6. VALIDAR ADMINISTRADOR
 // ======================================================
 
 $administrador = $_SESSION["administrador"]
     ?? $_SESSION["admin"]
     ?? null;
 
-if (!$administrador) {
+if (empty($administrador)) {
     responder(401, [
         "success" => false,
         "mensaje" => "Sesión no válida. Inicia sesión nuevamente."
@@ -110,7 +125,7 @@ if (!$administrador) {
 }
 
 // ======================================================
-// 6. CONEXIÓN A BASE DE DATOS
+// 7. CONEXIÓN A BASE DE DATOS
 // ======================================================
 
 try {
@@ -120,26 +135,49 @@ try {
     $database = new Database();
     $conexion = $database->connect();
 
-    if (!$conexion) {
-        throw new Exception("No se pudo establecer la conexión.");
+    if (!$conexion instanceof PDO) {
+        throw new Exception(
+            "La conexión a la base de datos no es válida."
+        );
     }
 
+    $conexion->setAttribute(
+        PDO::ATTR_ERRMODE,
+        PDO::ERRMODE_EXCEPTION
+    );
+
+    $conexion->setAttribute(
+        PDO::ATTR_DEFAULT_FETCH_MODE,
+        PDO::FETCH_ASSOC
+    );
+
     // ==================================================
-    // 7. ESTADÍSTICAS GENERALES
+    // 8. ESTADÍSTICAS GENERALES
     // ==================================================
 
     $sqlEstadisticas = "
         SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN estado = 'Pendiente' THEN 1 ELSE 0 END) AS pendientes,
-            SUM(CASE WHEN estado = 'Confirmada' THEN 1 ELSE 0 END) AS confirmadas,
-            SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) AS canceladas
+            SUM(CASE
+                WHEN estado = 'Pendiente' THEN 1
+                ELSE 0
+            END) AS pendientes,
+            SUM(CASE
+                WHEN estado = 'Confirmada' THEN 1
+                ELSE 0
+            END) AS confirmadas,
+            SUM(CASE
+                WHEN estado = 'Cancelada' THEN 1
+                ELSE 0
+            END) AS canceladas
         FROM inscripciones
     ";
 
-    $consultaEstadisticas = $conexion->query($sqlEstadisticas);
+    $consultaEstadisticas = $conexion->query(
+        $sqlEstadisticas
+    );
 
-    $estadisticas = $consultaEstadisticas->fetch(PDO::FETCH_ASSOC);
+    $estadisticas = $consultaEstadisticas->fetch();
 
     $estadisticasFinales = [
         "total" => (int) ($estadisticas["total"] ?? 0),
@@ -149,7 +187,7 @@ try {
     ];
 
     // ==================================================
-    // 8. LISTADO DE INSCRIPCIONES
+    // 9. LISTADO DE INSCRIPCIONES
     // ==================================================
 
     $sqlInscripciones = "
@@ -169,12 +207,14 @@ try {
         ORDER BY fecha_registro DESC
     ";
 
-    $consultaInscripciones = $conexion->query($sqlInscripciones);
+    $consultaInscripciones = $conexion->query(
+        $sqlInscripciones
+    );
 
-    $inscripciones = $consultaInscripciones->fetchAll(PDO::FETCH_ASSOC);
+    $inscripciones = $consultaInscripciones->fetchAll();
 
     // ==================================================
-    // 9. REPORTE POR TIPO DE VISITANTE
+    // 10. REPORTE POR TIPO DE VISITANTE
     // ==================================================
 
     $sqlPorTipo = "
@@ -188,10 +228,10 @@ try {
 
     $consultaPorTipo = $conexion->query($sqlPorTipo);
 
-    $porTipo = $consultaPorTipo->fetchAll(PDO::FETCH_ASSOC);
+    $porTipo = $consultaPorTipo->fetchAll();
 
     // ==================================================
-    // 10. REPORTE POR DISTRITO
+    // 11. REPORTE POR DISTRITO
     // ==================================================
 
     $sqlPorDistrito = "
@@ -205,10 +245,10 @@ try {
 
     $consultaPorDistrito = $conexion->query($sqlPorDistrito);
 
-    $porDistrito = $consultaPorDistrito->fetchAll(PDO::FETCH_ASSOC);
+    $porDistrito = $consultaPorDistrito->fetchAll();
 
     // ==================================================
-    // 11. REPORTE POR DÍA (ÚLTIMOS 7 DÍAS)
+    // 12. REPORTE POR DÍA (ÚLTIMOS 7 DÍAS)
     // ==================================================
 
     $sqlPorDia = "
@@ -216,17 +256,20 @@ try {
             DATE(fecha_registro) AS fecha,
             COUNT(*) AS cantidad
         FROM inscripciones
-        WHERE fecha_registro >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        WHERE fecha_registro >= DATE_SUB(
+            CURDATE(),
+            INTERVAL 6 DAY
+        )
         GROUP BY DATE(fecha_registro)
         ORDER BY fecha ASC
     ";
 
     $consultaPorDia = $conexion->query($sqlPorDia);
 
-    $porDia = $consultaPorDia->fetchAll(PDO::FETCH_ASSOC);
+    $porDia = $consultaPorDia->fetchAll();
 
     // ==================================================
-    // 12. NORMALIZAR VALORES NUMÉRICOS
+    // 13. NORMALIZAR VALORES
     // ==================================================
 
     foreach ($porTipo as &$fila) {
@@ -245,17 +288,23 @@ try {
     unset($fila);
 
     foreach ($inscripciones as &$fila) {
+
         $fila["id"] = (int) $fila["id"];
-        $fila["asistentes"] = (int) $fila["asistentes"];
+
+        $fila["asistentes"] = (int) (
+            $fila["asistentes"] ?? 0
+        );
     }
     unset($fila);
 
     // ==================================================
-    // 13. RESPUESTA FINAL
+    // 14. RESPUESTA FINAL
     // ==================================================
 
     responder(200, [
         "success" => true,
+
+        "mensaje" => "Dashboard cargado correctamente.",
 
         "estadisticas" => $estadisticasFinales,
 
@@ -268,6 +317,7 @@ try {
         ],
 
         "administrador" => $administrador,
+
         "admin" => $administrador
     ]);
 
