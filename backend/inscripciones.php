@@ -1,10 +1,12 @@
+
 <?php
 
 ob_start();
 
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Credentials: true");
 header("Vary: Origin");
 
 // =============================================
@@ -13,32 +15,34 @@ header("Vary: Origin");
 
 $origin = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-$allowedOrigins = [
-    "http://localhost:5173"
-];
+$frontendUrls = getenv("FRONTEND_URLS")
+    ?: "http://localhost:5173";
 
-// Dominios configurados en Railway
-$frontendUrls = getenv("FRONTEND_URLS") ?: "";
+$allowedOrigins = array_map(
+    "trim",
+    explode(",", $frontendUrls)
+);
 
-if (!empty($frontendUrls)) {
-    $extraOrigins = explode(",", $frontendUrls);
+$allowedOrigins = array_map(
+    fn($url) => rtrim($url, "/"),
+    $allowedOrigins
+);
 
-    foreach ($extraOrigins as $url) {
-        $url = trim($url);
-
-        if (!empty($url)) {
-            $allowedOrigins[] = rtrim($url, "/");
-        }
-    }
-}
+$allowedOrigins[] = "http://localhost:5173";
 
 if (in_array($origin, $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: " . $origin);
-    header("Access-Control-Allow-Credentials: true");
+} elseif ($origin !== "") {
+    http_response_code(403);
+    echo json_encode([
+        "success" => false,
+        "message" => "Origen no autorizado."
+    ]);
+    exit;
 }
 
 // =============================================
-// 2. RESPUESTA OPTIONS
+// 2. SOLICITUD OPTIONS
 // =============================================
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
@@ -47,7 +51,24 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 // =============================================
-// 3. CONEXIÓN A BASE DE DATOS
+// 3. SESIÓN ADMINISTRATIVA
+// =============================================
+
+if (session_status() === PHP_SESSION_NONE) {
+
+    session_set_cookie_params([
+        "lifetime" => 0,
+        "path" => "/",
+        "secure" => true,
+        "httponly" => true,
+        "samesite" => "None"
+    ]);
+
+    session_start();
+}
+
+// =============================================
+// 4. CONEXIÓN A BASE DE DATOS
 // =============================================
 
 require_once __DIR__ . "/config/database.php";
@@ -62,12 +83,10 @@ try {
     }
 
     // =============================================
-    // 4. MÉTODO GET - CONSULTA ADMINISTRATIVA
+    // 5. GET - CONSULTAR INSCRIPCIONES
     // =============================================
 
     if ($_SERVER["REQUEST_METHOD"] === "GET") {
-
-        session_start();
 
         if (!isset($_SESSION["administrador"])) {
             http_response_code(401);
@@ -96,13 +115,12 @@ try {
     }
 
     // =============================================
-    // 5. MÉTODO POST - REGISTRAR INSCRIPCIÓN
+    // 6. POST - REGISTRAR INSCRIPCIÓN
     // =============================================
 
     if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $contenido = file_get_contents("php://input");
-
         $data = json_decode($contenido, true);
 
         if (!is_array($data)) {
@@ -115,10 +133,6 @@ try {
 
             exit;
         }
-
-        // -----------------------------------------
-        // Compatibilidad de nombres React / PHP
-        // -----------------------------------------
 
         $nombres = trim($data["nombres"] ?? "");
         $apellidos = trim($data["apellidos"] ?? "");
@@ -139,11 +153,11 @@ try {
         $provincia = trim($data["provincia"] ?? "");
         $distrito = trim($data["distrito"] ?? "");
 
-        $asistentes = trim($data["asistentes"] ?? "");
+        $asistentes = trim((string)($data["asistentes"] ?? ""));
 
-        // -----------------------------------------
-        // Validar campos obligatorios
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR CAMPOS OBLIGATORIOS
+        // =============================================
 
         $camposObligatorios = [
             "nombres" => $nombres,
@@ -168,9 +182,9 @@ try {
             }
         }
 
-        // -----------------------------------------
-        // Validar longitud del nombre completo
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR NOMBRE
+        // =============================================
 
         $nombreCompleto = $nombres . " " . $apellidos;
 
@@ -185,9 +199,9 @@ try {
             exit;
         }
 
-        // -----------------------------------------
-        // Validar tipo de visitante
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR TIPO DE VISITANTE
+        // =============================================
 
         $tiposPermitidos = [
             "Estudiante",
@@ -207,9 +221,9 @@ try {
             exit;
         }
 
-        // -----------------------------------------
-        // Validar celular
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR CELULAR
+        // =============================================
 
         if (!preg_match("/^9[0-9]{8}$/", $celular)) {
             http_response_code(400);
@@ -222,9 +236,9 @@ try {
             exit;
         }
 
-        // -----------------------------------------
-        // Validar correo
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR CORREO
+        // =============================================
 
         if ($correo !== "" && !filter_var($correo, FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
@@ -237,9 +251,9 @@ try {
             exit;
         }
 
-        // -----------------------------------------
-        // Validar datos académicos
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR DATOS ACADÉMICOS
+        // =============================================
 
         if ($tipoVisitante === "Estudiante") {
 
@@ -255,14 +269,13 @@ try {
             }
 
         } else {
-
             $colegio = "";
             $grado = "";
         }
 
-        // -----------------------------------------
-        // Validar asistentes
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR ASISTENTES
+        // =============================================
 
         $asistentesPermitidos = ["1", "2", "3", "4", "5"];
 
@@ -277,9 +290,9 @@ try {
             exit;
         }
 
-        // -----------------------------------------
-        // Validar longitudes de campos
-        // -----------------------------------------
+        // =============================================
+        // VALIDAR LONGITUDES
+        // =============================================
 
         $limites = [
             "correo" => [$correo, 150],
@@ -307,40 +320,40 @@ try {
         }
 
         // =============================================
-        // 6. INSERTAR EN MYSQL
+        // INSERTAR EN MYSQL
         // =============================================
 
         $sql = "INSERT INTO inscripciones (
-                    nombre,
-                    nombres,
-                    apellidos,
-                    tipo_visitante,
-                    celular,
-                    correo,
-                    departamento,
-                    provincia,
-                    colegio,
-                    grado,
-                    distrito,
-                    asistentes,
-                    fecha_registro,
-                    estado
-                ) VALUES (
-                    :nombre,
-                    :nombres,
-                    :apellidos,
-                    :tipo_visitante,
-                    :celular,
-                    :correo,
-                    :departamento,
-                    :provincia,
-                    :colegio,
-                    :grado,
-                    :distrito,
-                    :asistentes,
-                    CURRENT_TIMESTAMP,
-                    'Pendiente'
-                )";
+            nombre,
+            nombres,
+            apellidos,
+            tipo_visitante,
+            celular,
+            correo,
+            departamento,
+            provincia,
+            colegio,
+            grado,
+            distrito,
+            asistentes,
+            fecha_registro,
+            estado
+        ) VALUES (
+            :nombre,
+            :nombres,
+            :apellidos,
+            :tipo_visitante,
+            :celular,
+            :correo,
+            :departamento,
+            :provincia,
+            :colegio,
+            :grado,
+            :distrito,
+            :asistentes,
+            CURRENT_TIMESTAMP,
+            'Pendiente'
+        )";
 
         $stmt = $conexion->prepare($sql);
 
@@ -359,10 +372,6 @@ try {
             ":asistentes" => $asistentes
         ]);
 
-        // =============================================
-        // 7. RESPUESTA EXITOSA
-        // =============================================
-
         http_response_code(201);
 
         echo json_encode([
@@ -375,7 +384,7 @@ try {
     }
 
     // =============================================
-    // 8. MÉTODO NO PERMITIDO
+    // MÉTODO NO PERMITIDO
     // =============================================
 
     http_response_code(405);
