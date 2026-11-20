@@ -358,57 +358,71 @@ function Dashboard() {
   // ELIMINAR INSCRIPCIÓN
   // =====================================================
 
-  const eliminarInscripcion = async (id, nombre) => {
-    if (!id || eliminandoId !== null) return;
+ 
+const eliminarInscripcion = async (id, nombre) => {
+  console.log("1. Botón de eliminar ejecutado");
+  console.log("2. ID recibido:", id);
 
-    const confirmar = window.confirm(
-      `¿Deseas eliminar la inscripción de "${nombre || "este visitante"}"?\n\nEsta acción no se puede deshacer.`
+  if (!id || eliminandoId !== null) {
+    console.warn("Eliminación bloqueada. ID:", id);
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `¿Deseas eliminar la inscripción de "${nombre || "este visitante"}"?`
+  );
+
+  console.log("3. Confirmación:", confirmar);
+
+  if (!confirmar) return;
+
+  setEliminandoId(id);
+  setError("");
+  setMensaje("");
+
+  try {
+    const url = obtenerUrl("eliminar_inscripcion.php");
+
+    console.log("4. Enviando solicitud a:", url);
+
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ id: Number(id) }),
+    });
+
+    console.log("5. Estado HTTP:", response.status);
+
+    const resultado = await leerRespuesta(response);
+
+    console.log("6. Respuesta PHP:", resultado);
+
+    setInscripciones((actuales) =>
+      actuales.filter(
+        (item) => Number(item.id) !== Number(id)
+      )
     );
 
-    if (!confirmar) return;
+    setInscripcionSeleccionada((actual) =>
+      actual && Number(actual.id) === Number(id)
+        ? null
+        : actual
+    );
 
-    setEliminandoId(id);
-    setError("");
-    setMensaje("");
-
-    try {
-      const response = await fetch(
-        obtenerUrl("eliminar_inscripcion.php"),
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ id }),
-        }
-      );
-
-      const resultado = await leerRespuesta(response);
-
-      setInscripciones((actuales) =>
-        actuales.filter(
-          (item) => Number(item.id) !== Number(id)
-        )
-      );
-
-      setInscripcionSeleccionada((actual) =>
-        actual && Number(actual.id) === Number(id)
-          ? null
-          : actual
-      );
-
-      setMensaje(
-        resultado.mensaje || "Inscripción eliminada correctamente."
-      );
-    } catch (err) {
-      console.error("Error al eliminar inscripción:", err);
-      setError(err.message || "No se pudo eliminar la inscripción.");
-    } finally {
-      setEliminandoId(null);
-    }
-  };
+    setMensaje(
+      resultado.mensaje || "Inscripción eliminada correctamente."
+    );
+  } catch (err) {
+    console.error("ERROR AL ELIMINAR:", err);
+    setError(err.message || "No se pudo eliminar la inscripción.");
+  } finally {
+    setEliminandoId(null);
+  }
+};
 
   // =====================================================
   // EXPORTAR CSV
