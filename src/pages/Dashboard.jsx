@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   LayoutDashboard,
   ClipboardList,
@@ -19,25 +20,32 @@ import {
   MapPin,
   CalendarDays,
   GraduationCap,
-  UserRound,
-  FileText,
-  Building2,
   X,
   Filter,
-  Mail,
-  Phone,
-  User,
   UsersRound,
   CalendarCheck,
   ShieldCheck,
+  FileSpreadsheet,
+  FileText,
+  TrendingUp,
+  UserRound,
+  Mail,
+  Phone,
+  Building2,
+  RotateCcw,
+  Check,
+  AlertCircle,
+  Activity,
+  ArrowUpDown,
+  ExternalLink,
 } from "lucide-react";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import "./Dashboard.css";
-
 import API_URL from "../config/api";
+
 const ITEMS_PER_PAGE = 8;
 
 const MENU_ITEMS = [
@@ -49,7 +57,6 @@ const MENU_ITEMS = [
 
 const ESTADOS = ["Pendiente", "Confirmada", "Cancelada"];
 
-// Los 16 distritos de la provincia de Cañete.
 const DISTRITOS_CANETE = [
   "Asia",
   "Calango",
@@ -68,6 +75,20 @@ const DISTRITOS_CANETE = [
   "Santa Cruz de Flores",
   "Zúñiga",
 ];
+
+const TIPOS_VISITANTES = [
+  "Estudiante",
+  "Padre o madre",
+  "Tutor",
+  "Otro familiar",
+];
+
+const normalizarTexto = (texto) =>
+  String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 const formatearFecha = (fecha) => {
   if (!fecha) return "—";
@@ -100,22 +121,13 @@ const formatearFechaCompleta = (fecha) => {
   });
 };
 
-const obtenerIniciales = (nombre = "") => {
-  return nombre
+const obtenerIniciales = (nombre = "") =>
+  String(nombre)
     .trim()
     .split(/\s+/)
     .slice(0, 2)
     .map((parte) => parte.charAt(0).toUpperCase())
-    .join("");
-};
-
-const normalizarTexto = (texto) => {
-  return String(texto ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-};
+    .join("") || "AD";
 
 const obtenerClaseEstado = (estado) => {
   const valor = normalizarTexto(estado);
@@ -126,19 +138,50 @@ const obtenerClaseEstado = (estado) => {
   return "status-pendiente";
 };
 
-const calcularEstadisticas = (registros) => {
-  return {
-    total: registros.length,
-    pendientes: registros.filter(
-      (item) => item.estado === "Pendiente"
-    ).length,
-    confirmadas: registros.filter(
-      (item) => item.estado === "Confirmada"
-    ).length,
-    canceladas: registros.filter(
-      (item) => item.estado === "Cancelada"
-    ).length,
-  };
+const calcularEstadisticas = (registros) => ({
+  total: registros.length,
+  pendientes: registros.filter(
+    (item) => normalizarTexto(item.estado) === "pendiente"
+  ).length,
+  confirmadas: registros.filter(
+    (item) => normalizarTexto(item.estado) === "confirmada"
+  ).length,
+  canceladas: registros.filter(
+    (item) => normalizarTexto(item.estado) === "cancelada"
+  ).length,
+});
+
+const obtenerFechaLocal = (fecha = new Date()) => {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dia = String(fecha.getDate()).padStart(2, "0");
+
+  return `${anio}-${mes}-${dia}`;
+};
+
+// CAMBIO: lectura de respuestas más segura.
+// Permite identificar respuestas no JSON y errores HTTP.
+const leerRespuesta = async (respuesta) => {
+  const texto = await respuesta.text();
+
+  let resultado;
+
+  try {
+    resultado = texto ? JSON.parse(texto) : {};
+  } catch {
+    throw new Error(
+      `El servidor devolvió una respuesta no válida. Código HTTP: ${respuesta.status}.`
+    );
+  }
+
+  if (!respuesta.ok || resultado.success === false) {
+    throw new Error(
+      resultado.message ||
+        `No se pudo completar la solicitud. Código HTTP: ${respuesta.status}.`
+    );
+  }
+
+  return resultado;
 };
 
 function Dashboard() {
@@ -149,7 +192,6 @@ function Dashboard() {
 
   const [cargando, setCargando] = useState(true);
   const [actualizando, setActualizando] = useState(false);
-
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -158,6 +200,7 @@ function Dashboard() {
   const [filtroTipo, setFiltroTipo] = useState("Todos");
   const [filtroDistrito, setFiltroDistrito] = useState("Todos");
 
+  const [orden, setOrden] = useState("recientes");
   const [paginaActual, setPaginaActual] = useState(1);
 
   const [inscripcionSeleccionada, setInscripcionSeleccionada] =
@@ -165,21 +208,45 @@ function Dashboard() {
 
   const [actualizandoEstado, setActualizandoEstado] = useState(null);
 
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+
   // ---------------------------------------------------
   // ADMINISTRADOR
   // ---------------------------------------------------
 
   useEffect(() => {
-    const adminGuardado = sessionStorage.getItem("admin");
+    // CAMBIO: se utiliza la misma clave que Login.jsx.
+    const adminGuardado =
+      sessionStorage.getItem("administrador") ||
+      sessionStorage.getItem("admin");
 
     if (adminGuardado) {
       try {
-        setAdministrador(JSON.parse(adminGuardado));
+        const admin = JSON.parse(adminGuardado);
+        setAdministrador(admin);
+
+        sessionStorage.setItem(
+          "administrador",
+          JSON.stringify(admin)
+        );
       } catch {
-        setAdministrador(null);
+        sessionStorage.removeItem("admin");
+        sessionStorage.removeItem("administrador");
       }
     }
   }, []);
+
+  // ---------------------------------------------------
+  // MENSAJES TEMPORALES
+  // ---------------------------------------------------
+
+  const mostrarMensaje = (texto) => {
+    setMensaje(texto);
+
+    window.setTimeout(() => {
+      setMensaje("");
+    }, 4000);
+  };
 
   // ---------------------------------------------------
   // CARGAR INFORMACIÓN DEL DASHBOARD
@@ -201,15 +268,10 @@ function Dashboard() {
         headers: {
           Accept: "application/json",
         },
+        cache: "no-store",
       });
 
-      const resultado = await respuesta.json();
-
-      if (!respuesta.ok || resultado.success === false) {
-        throw new Error(
-          resultado.message || "No se pudieron cargar los datos."
-        );
-      }
+      const resultado = await leerRespuesta(respuesta);
 
       const registros =
         resultado.inscripciones ??
@@ -217,19 +279,33 @@ function Dashboard() {
         resultado.registrations ??
         [];
 
-      setInscripciones(Array.isArray(registros) ? registros : []);
+      if (!Array.isArray(registros)) {
+        throw new Error(
+          "El servidor no devolvió una lista válida de inscripciones."
+        );
+      }
 
-      if (resultado.admin) {
-        setAdministrador(resultado.admin);
+      setInscripciones(registros);
+
+      const admin =
+        resultado.administrador ??
+        resultado.admin ??
+        null;
+
+      if (admin) {
+        setAdministrador(admin);
+
         sessionStorage.setItem(
-          "admin",
-          JSON.stringify(resultado.admin)
+          "administrador",
+          JSON.stringify(admin)
         );
       }
     } catch (err) {
       console.error("Error al cargar el dashboard:", err);
+
       setError(
-        err.message || "Ocurrió un error al conectar con el servidor."
+        err.message ||
+          "No se pudo conectar con el servidor. Verifica tu conexión."
       );
     } finally {
       setCargando(false);
@@ -242,13 +318,20 @@ function Dashboard() {
   }, [cargarDatos]);
 
   // ---------------------------------------------------
-  // ESTADÍSTICAS GENERALES
+  // ESTADÍSTICAS
   // ---------------------------------------------------
 
   const estadisticas = useMemo(
     () => calcularEstadisticas(inscripciones),
     [inscripciones]
   );
+
+  const porcentajeConfirmadas =
+    estadisticas.total > 0
+      ? Math.round(
+          (estadisticas.confirmadas / estadisticas.total) * 100
+        )
+      : 0;
 
   const tiposVisitantes = useMemo(() => {
     const conteo = {};
@@ -270,7 +353,6 @@ function Dashboard() {
       .sort((a, b) => b.cantidad - a.cantidad);
   }, [inscripciones]);
 
-  // Conteo general de distritos registrados en MySQL.
   const distritos = useMemo(() => {
     const conteo = {};
 
@@ -283,15 +365,10 @@ function Dashboard() {
       .map(([nombre, cantidad]) => ({
         nombre,
         cantidad,
-        porcentaje:
-          inscripciones.length > 0
-            ? (cantidad / inscripciones.length) * 100
-            : 0,
       }))
       .sort((a, b) => b.cantidad - a.cantidad);
   }, [inscripciones]);
 
-  // Reporte de los 16 distritos, incluso cuando tienen cero inscritos.
   const distritosCanete = useMemo(() => {
     return DISTRITOS_CANETE.map((nombre) => {
       const registro = distritos.find(
@@ -320,10 +397,7 @@ function Dashboard() {
       fecha.setHours(0, 0, 0, 0);
       fecha.setDate(fecha.getDate() - i);
 
-      const anio = fecha.getFullYear();
-      const mes = String(fecha.getMonth() + 1).padStart(2, "0");
-      const dia = String(fecha.getDate()).padStart(2, "0");
-      const clave = `${anio}-${mes}-${dia}`;
+      const clave = obtenerFechaLocal(fecha);
 
       const cantidad = inscripciones.filter((item) => {
         if (!item.fecha_registro) return false;
@@ -359,41 +433,44 @@ function Dashboard() {
           String(b.fecha_registro || "").replace(" ", "T")
         ).getTime();
 
-        return fechaB - fechaA;
+        return (fechaB || 0) - (fechaA || 0);
       })
       .slice(0, 5);
   }, [inscripciones]);
 
   // ---------------------------------------------------
-  // FILTROS DE INSCRIPCIONES
+  // FILTROS Y ORDENAMIENTO
   // ---------------------------------------------------
-
-  // Ahora el filtro siempre muestra los 16 distritos.
-  const opcionesDistritos = DISTRITOS_CANETE;
 
   const inscripcionesFiltradas = useMemo(() => {
     const termino = normalizarTexto(busqueda);
 
-    return inscripciones.filter((item) => {
+    const resultado = inscripciones.filter((item) => {
+      const textoBusqueda = [
+        item.nombre,
+        item.correo,
+        item.celular,
+        item.distrito,
+        item.colegio,
+        item.tipo_visitante,
+      ]
+        .map(normalizarTexto)
+        .join(" ");
+
       const coincideBusqueda =
-        !termino ||
-        normalizarTexto(item.nombre).includes(termino) ||
-        normalizarTexto(item.correo).includes(termino) ||
-        normalizarTexto(item.celular).includes(termino) ||
-        normalizarTexto(item.distrito).includes(termino) ||
-        normalizarTexto(item.colegio).includes(termino);
+        !termino || textoBusqueda.includes(termino);
 
       const coincideEstado =
-        filtroEstado === "Todos" || item.estado === filtroEstado;
+        filtroEstado === "Todos" ||
+        normalizarTexto(item.estado) === normalizarTexto(filtroEstado);
 
       const coincideTipo =
         filtroTipo === "Todos" ||
-        item.tipo_visitante === filtroTipo;
+        normalizarTexto(item.tipo_visitante) === normalizarTexto(filtroTipo);
 
       const coincideDistrito =
         filtroDistrito === "Todos" ||
-        normalizarTexto(item.distrito) ===
-          normalizarTexto(filtroDistrito);
+        normalizarTexto(item.distrito) === normalizarTexto(filtroDistrito);
 
       return (
         coincideBusqueda &&
@@ -402,12 +479,36 @@ function Dashboard() {
         coincideDistrito
       );
     });
+
+    resultado.sort((a, b) => {
+      if (orden === "nombre") {
+        return String(a.nombre || "").localeCompare(
+          String(b.nombre || ""),
+          "es"
+        );
+      }
+
+      if (orden === "antiguos") {
+        return (
+          new Date(String(a.fecha_registro || "").replace(" ", "T")) -
+          new Date(String(b.fecha_registro || "").replace(" ", "T"))
+        );
+      }
+
+      return (
+        new Date(String(b.fecha_registro || "").replace(" ", "T")) -
+        new Date(String(a.fecha_registro || "").replace(" ", "T"))
+      );
+    });
+
+    return resultado;
   }, [
     inscripciones,
     busqueda,
     filtroEstado,
     filtroTipo,
     filtroDistrito,
+    orden,
   ]);
 
   const totalPaginas = Math.max(
@@ -426,7 +527,7 @@ function Dashboard() {
 
   useEffect(() => {
     setPaginaActual(1);
-  }, [busqueda, filtroEstado, filtroTipo, filtroDistrito]);
+  }, [busqueda, filtroEstado, filtroTipo, filtroDistrito, orden]);
 
   useEffect(() => {
     if (paginaActual > totalPaginas) {
@@ -439,11 +540,18 @@ function Dashboard() {
     setFiltroEstado("Todos");
     setFiltroTipo("Todos");
     setFiltroDistrito("Todos");
+    setOrden("recientes");
     setPaginaActual(1);
   };
 
+  const hayFiltrosActivos =
+    busqueda !== "" ||
+    filtroEstado !== "Todos" ||
+    filtroTipo !== "Todos" ||
+    filtroDistrito !== "Todos";
+
   // ---------------------------------------------------
-  // ACTUALIZAR ESTADO DE UNA INSCRIPCIÓN
+  // CAMBIAR ESTADO
   // ---------------------------------------------------
 
   const cambiarEstado = async (id, nuevoEstado) => {
@@ -476,13 +584,7 @@ function Dashboard() {
         }
       );
 
-      const resultado = await respuesta.json();
-
-      if (!respuesta.ok || resultado.success === false) {
-        throw new Error(
-          resultado.message || "No se pudo actualizar el estado."
-        );
-      }
+      await leerRespuesta(respuesta);
 
       setInscripciones((actuales) =>
         actuales.map((item) =>
@@ -498,12 +600,9 @@ function Dashboard() {
           : actual
       );
 
-      setMensaje(
-        "El estado de la inscripción se actualizó correctamente."
-      );
-
-      window.setTimeout(() => setMensaje(""), 3500);
+      mostrarMensaje("Estado actualizado correctamente.");
     } catch (err) {
+      console.error("Error al actualizar estado:", err);
       setError(err.message);
     } finally {
       setActualizandoEstado(null);
@@ -511,7 +610,77 @@ function Dashboard() {
   };
 
   // ---------------------------------------------------
-  // EXPORTAR INSCRIPCIONES A PDF
+  // EXPORTAR CSV
+  // ---------------------------------------------------
+
+  const exportarCSV = () => {
+    if (inscripcionesFiltradas.length === 0) {
+      window.alert("No hay registros para exportar.");
+      return;
+    }
+
+    const columnas = [
+      "ID",
+      "Nombre",
+      "Tipo de visitante",
+      "Celular",
+      "Correo",
+      "Colegio",
+      "Grado",
+      "Distrito",
+      "Asistentes",
+      "Fecha de registro",
+      "Estado",
+    ];
+
+    const escaparCSV = (valor) => {
+      const texto = String(valor ?? "");
+      return `"${texto.replace(/"/g, '""')}"`;
+    };
+
+    const filas = inscripcionesFiltradas.map((item) => [
+      item.id,
+      item.nombre,
+      item.tipo_visitante,
+      item.celular,
+      item.correo,
+      item.colegio,
+      item.grado,
+      item.distrito,
+      item.asistentes,
+      item.fecha_registro,
+      item.estado,
+    ]);
+
+    const contenido = [
+      columnas,
+      ...filas,
+    ]
+      .map((fila) => fila.map(escaparCSV).join(";"))
+      .join("\n");
+
+    // BOM para que Excel reconozca correctamente los caracteres especiales.
+    const archivo = new Blob(
+      ["\uFEFF", contenido],
+      { type: "text/csv;charset=utf-8;" }
+    );
+
+    const url = URL.createObjectURL(archivo);
+    const enlace = document.createElement("a");
+
+    enlace.href = url;
+    enlace.download = "Inscripciones_Open_Day_2026.csv";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+
+    URL.revokeObjectURL(url);
+
+    mostrarMensaje("Archivo CSV exportado correctamente.");
+  };
+
+  // ---------------------------------------------------
+  // EXPORTAR PDF
   // ---------------------------------------------------
 
   const exportarPDF = () => {
@@ -627,6 +796,7 @@ function Dashboard() {
 
         documento.setFontSize(8);
         documento.setTextColor(130, 140, 150);
+
         documento.text(
           "Valle Grande | Open Day 2026",
           14,
@@ -643,6 +813,8 @@ function Dashboard() {
     });
 
     documento.save("Reporte_Inscripciones_Open_Day_2026.pdf");
+
+    mostrarMensaje("Reporte PDF generado correctamente.");
   };
 
   // ---------------------------------------------------
@@ -657,14 +829,22 @@ function Dashboard() {
     if (!confirmar) return;
 
     try {
-      await fetch(`${API_URL}/logout.php`, {
+      const respuesta = await fetch(`${API_URL}/logout.php`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
       });
+
+      // Se intenta leer la respuesta, pero se limpian los datos
+      // locales incluso si el servidor devuelve un error.
+      await respuesta.text();
     } catch (err) {
       console.error("No se pudo contactar con el servidor:", err);
     } finally {
       sessionStorage.removeItem("admin");
+      sessionStorage.removeItem("administrador");
       window.location.href = "/admin";
     }
   };
@@ -681,10 +861,12 @@ function Dashboard() {
   };
 
   const nombreAdministrador =
-    administrador?.nombre || "Administrador";
+    administrador?.nombre ||
+    administrador?.usuario ||
+    "Administrador";
 
   const inicialesAdministrador =
-    obtenerIniciales(nombreAdministrador) || "AD";
+    obtenerIniciales(nombreAdministrador);
 
   const fechaHoy = new Date().toLocaleDateString("es-PE", {
     weekday: "long",
@@ -698,9 +880,74 @@ function Dashboard() {
   // ---------------------------------------------------
 
   const EstadoBadge = ({ estado }) => (
-    <span className={`registration-status ${obtenerClaseEstado(estado)}`}>
+    <span
+      className={`registration-status ${obtenerClaseEstado(estado)}`}
+    >
       {estado || "Pendiente"}
     </span>
+  );
+
+  // ---------------------------------------------------
+  // COMPONENTE: TARJETAS ESTADÍSTICAS
+  // ---------------------------------------------------
+
+  const TarjetaEstadistica = ({
+    titulo,
+    valor,
+    descripcion,
+    icono: Icono,
+    clase,
+  }) => (
+    <div className={`stat-card ${clase}`}>
+      <div className="stat-card-header">
+        <span className="stat-card-title">{titulo}</span>
+        <div className="stat-card-icon">
+          <Icono size={20} />
+        </div>
+      </div>
+
+      <strong className="stat-card-value">{valor}</strong>
+
+      <span className="stat-card-description">
+        {descripcion}
+      </span>
+    </div>
+  );
+
+  const TarjetasEstadisticas = () => (
+    <div className="dashboard-stats">
+      <TarjetaEstadistica
+        titulo="Total de inscritos"
+        valor={estadisticas.total}
+        descripcion="Inscripciones registradas"
+        icono={Users}
+        clase="total"
+      />
+
+      <TarjetaEstadistica
+        titulo="Pendientes"
+        valor={estadisticas.pendientes}
+        descripcion="Por revisar o confirmar"
+        icono={Clock3}
+        clase="pending"
+      />
+
+      <TarjetaEstadistica
+        titulo="Confirmadas"
+        valor={estadisticas.confirmadas}
+        descripcion="Inscripciones confirmadas"
+        icono={CircleCheck}
+        clase="confirmed"
+      />
+
+      <TarjetaEstadistica
+        titulo="Canceladas"
+        valor={estadisticas.canceladas}
+        descripcion="Inscripciones canceladas"
+        icono={CircleX}
+        clase="cancelled"
+      />
+    </div>
   );
 
   // ---------------------------------------------------
@@ -714,8 +961,9 @@ function Dashboard() {
     if (registros.length === 0) {
       return (
         <div className="empty-state">
-          <ClipboardList />
+          <ClipboardList size={30} />
           <p>No se encontraron inscripciones.</p>
+          <span>Los registros aparecerán aquí cuando existan datos.</span>
         </div>
       );
     }
@@ -744,7 +992,7 @@ function Dashboard() {
                     </div>
 
                     <div>
-                      <strong>{item.nombre}</strong>
+                      <strong>{item.nombre || "Sin nombre"}</strong>
                       <small>
                         {item.correo || "Sin correo registrado"}
                       </small>
@@ -767,9 +1015,11 @@ function Dashboard() {
                         type="button"
                         className="action-button"
                         title="Ver detalles"
-                        onClick={() => setInscripcionSeleccionada(item)}
+                        onClick={() =>
+                          setInscripcionSeleccionada(item)
+                        }
                       >
-                        <Eye />
+                        <Eye size={16} />
                       </button>
 
                       <select
@@ -779,16 +1029,6 @@ function Dashboard() {
                         onChange={(e) =>
                           cambiarEstado(item.id, e.target.value)
                         }
-                        style={{
-                          width: "118px",
-                          minHeight: "33px",
-                          padding: "0 7px",
-                          color: "#53677e",
-                          background: "#fff",
-                          border: "1px solid #e7edf4",
-                          borderRadius: "8px",
-                          fontSize: "10px",
-                        }}
                       >
                         {ESTADOS.map((estado) => (
                           <option key={estado} value={estado}>
@@ -808,89 +1048,62 @@ function Dashboard() {
   };
 
   // ---------------------------------------------------
+  // COMPONENTE: ENCABEZADO DE SECCIÓN
+  // ---------------------------------------------------
+
+  const Encabezado = ({
+    titulo,
+    descripcion,
+    acciones,
+  }) => (
+    <div className="dashboard-header">
+      <div className="dashboard-welcome">
+        <h1>{titulo}</h1>
+        <p>{descripcion}</p>
+      </div>
+
+      <div className="dashboard-header-actions">
+        {acciones}
+      </div>
+    </div>
+  );
+
+  const BotonActualizar = () => (
+    <button
+      type="button"
+      className="btn-secondary"
+      onClick={() => cargarDatos(false)}
+      disabled={actualizando}
+    >
+      <RefreshCw
+        size={15}
+        className={actualizando ? "refresh-spinning" : ""}
+      />
+      {actualizando ? "Actualizando..." : "Actualizar"}
+    </button>
+  );
+
+  // ---------------------------------------------------
   // SECCIÓN: RESUMEN GENERAL
   // ---------------------------------------------------
 
   const renderResumen = () => (
     <>
-      <div className="dashboard-header">
-        <div className="dashboard-welcome">
-          <h1>Resumen general</h1>
-          <p>
-            Hola, {nombreAdministrador}. Aquí tienes el estado de las
-            inscripciones del Open Day.
-          </p>
-        </div>
+      <Encabezado
+        titulo="Resumen general"
+        descripcion={`Hola, ${nombreAdministrador}. Aquí tienes el estado de las inscripciones del Open Day.`}
+        acciones={
+          <>
+            <div className="dashboard-date">
+              <CalendarDays size={15} />
+              {fechaHoy}
+            </div>
+            <BotonActualizar />
+          </>
+        }
+      />
 
-        <div className="dashboard-header-actions">
-          <div className="dashboard-date">
-            <CalendarDays
-              size={15}
-              style={{ marginRight: 7, verticalAlign: "middle" }}
-            />
-            {fechaHoy}
-          </div>
-
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => cargarDatos(false)}
-            disabled={actualizando}
-          >
-            <RefreshCw
-              size={15}
-              className={actualizando ? "refresh-spinning" : ""}
-            />
-            Actualizar
-          </button>
-        </div>
-      </div>
-
-      <div className="dashboard-stats">
-        <div className="stat-card total">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Total de inscritos</span>
-            <div className="stat-card-icon"><Users /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.total}</strong>
-          <span className="stat-card-description">
-            Inscripciones registradas
-          </span>
-        </div>
-
-        <div className="stat-card pending">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Pendientes</span>
-            <div className="stat-card-icon"><Clock3 /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.pendientes}</strong>
-          <span className="stat-card-description">
-            Por revisar o confirmar
-          </span>
-        </div>
-
-        <div className="stat-card confirmed">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Confirmadas</span>
-            <div className="stat-card-icon"><CircleCheck /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.confirmadas}</strong>
-          <span className="stat-card-description">
-            Inscripciones confirmadas
-          </span>
-        </div>
-
-        <div className="stat-card cancelled">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Canceladas</span>
-            <div className="stat-card-icon"><CircleX /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.canceladas}</strong>
-          <span className="stat-card-description">
-            Inscripciones canceladas
-          </span>
-        </div>
-      </div>
+      <TarjetasEstadisticas />
 
       <div className="dashboard-middle">
         <section className="dashboard-panel">
@@ -935,76 +1148,106 @@ function Dashboard() {
               <h2>Actividad de los últimos 7 días</h2>
               <p>Nuevas inscripciones por día</p>
             </div>
-            <ChartNoAxesCombined size={19} color="#7790a8" />
+            <Activity size={19} color="#7790a8" />
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "space-around",
-              gap: 12,
-              minHeight: 155,
-              paddingTop: 15,
-            }}
-          >
+          <div className="weekly-chart">
             {actividadSemanal.map((dia) => (
-              <div
-                key={dia.fecha}
-                style={{
-                  display: "flex",
-                  flex: 1,
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 145,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <strong style={{ color: "#52677e", fontSize: 11 }}>
-                  {dia.cantidad}
-                </strong>
+              <div className="weekly-chart-item" key={dia.fecha}>
+                <strong>{dia.cantidad}</strong>
 
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    width: "100%",
-                    height: 95,
-                    background: "#f1f5f9",
-                    borderRadius: "8px 8px 3px 3px",
-                    overflow: "hidden",
-                  }}
-                >
+                <div className="weekly-chart-track">
                   <div
+                    className="weekly-chart-bar"
                     style={{
-                      width: "100%",
                       height: `${
                         dia.cantidad === 0
                           ? 3
                           : (dia.cantidad / maxActividad) * 100
                       }%`,
-                      minHeight: 3,
-                      background:
-                        "linear-gradient(180deg, #70b4e2, #246da7)",
-                      borderRadius: "8px 8px 0 0",
-                      transition: "height .3s ease",
                     }}
                   />
                 </div>
 
-                <span
-                  style={{
-                    color: "#8b9bad",
-                    fontSize: 10,
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {dia.nombre}
-                </span>
+                <span>{dia.nombre}</span>
               </div>
             ))}
           </div>
+        </section>
+      </div>
+
+      <div className="dashboard-middle">
+        <section className="dashboard-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Estado de las inscripciones</h2>
+              <p>Porcentaje de registros confirmados</p>
+            </div>
+            <TrendingUp size={19} color="#7790a8" />
+          </div>
+
+          <div className="completion-summary">
+            <strong>{porcentajeConfirmadas}%</strong>
+            <span>de inscripciones confirmadas</span>
+          </div>
+
+          <div className="report-progress completion-progress">
+            <div
+              className="report-progress-bar"
+              style={{ width: `${porcentajeConfirmadas}%` }}
+            />
+          </div>
+
+          <div className="completion-details">
+            <span>
+              <i className="completion-dot confirmed-dot" />
+              Confirmadas: {estadisticas.confirmadas}
+            </span>
+            <span>
+              <i className="completion-dot pending-dot" />
+              Pendientes: {estadisticas.pendientes}
+            </span>
+          </div>
+        </section>
+
+        <section className="dashboard-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Principales distritos</h2>
+              <p>Distritos con más visitantes registrados</p>
+            </div>
+            <MapPin size={19} color="#7790a8" />
+          </div>
+
+          {distritos.length > 0 ? (
+            <div className="report-list">
+              {distritos.slice(0, 5).map((item) => (
+                <div className="report-item" key={item.nombre}>
+                  <div className="report-item-header">
+                    <span>{item.nombre}</span>
+                    <strong>{item.cantidad}</strong>
+                  </div>
+
+                  <div className="report-progress">
+                    <div
+                      className="report-progress-bar"
+                      style={{
+                        width: `${
+                          estadisticas.total > 0
+                            ? (item.cantidad / estadisticas.total) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              No hay distritos registrados.
+            </div>
+          )}
         </section>
       </div>
 
@@ -1033,6 +1276,7 @@ function Dashboard() {
 
       <div className="event-banner">
         <div>
+          <span className="event-banner-label">VALLE GRANDE</span>
           <h2>Open Day 2026</h2>
           <p>
             Administra las inscripciones, revisa la información de
@@ -1052,78 +1296,26 @@ function Dashboard() {
 
   const renderInscripciones = () => (
     <>
-      <div className="dashboard-header">
-        <div className="dashboard-welcome">
-          <h1>Inscripciones</h1>
-          <p>
-            Consulta, filtra y administra los registros de los visitantes.
-          </p>
-        </div>
+      <Encabezado
+        titulo="Inscripciones"
+        descripcion="Consulta, filtra y administra los registros de los visitantes."
+        acciones={
+          <>
+            <BotonActualizar />
 
-        <div className="dashboard-header-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => cargarDatos(false)}
-            disabled={actualizando}
-          >
-            <RefreshCw
-              size={15}
-              className={actualizando ? "refresh-spinning" : ""}
-            />
-            Actualizar
-          </button>
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exportarPDF}
+            >
+              <Download size={16} />
+              Exportar PDF
+            </button>
+          </>
+        }
+      />
 
-          <button
-            type="button"
-            className="btn-export"
-            onClick={exportarPDF}
-          >
-            <Download size={16} />
-            Exportar PDF
-          </button>
-        </div>
-      </div>
-
-      <div className="dashboard-stats">
-        <div className="stat-card total">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Total de inscritos</span>
-            <div className="stat-card-icon"><Users /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.total}</strong>
-          <span className="stat-card-description">Registros en el sistema</span>
-        </div>
-
-        <div className="stat-card pending">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Pendientes</span>
-            <div className="stat-card-icon"><Clock3 /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.pendientes}</strong>
-          <span className="stat-card-description">Por confirmar</span>
-        </div>
-
-        <div className="stat-card confirmed">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Confirmadas</span>
-            <div className="stat-card-icon"><CircleCheck /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.confirmadas}</strong>
-          <span className="stat-card-description">
-            Confirmadas correctamente
-          </span>
-        </div>
-
-        <div className="stat-card cancelled">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Canceladas</span>
-            <div className="stat-card-icon"><CircleX /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.canceladas}</strong>
-          <span className="stat-card-description">Registros cancelados</span>
-        </div>
-      </div>
+      <TarjetasEstadisticas />
 
       <section className="registrations-panel">
         <div className="registrations-header">
@@ -1134,30 +1326,31 @@ function Dashboard() {
                 {inscripcionesFiltradas.length}
               </span>
             </h2>
-            <p style={{ margin: "6px 0 0", color: "#718096", fontSize: 11 }}>
+
+            <p>
               Listado completo de personas inscritas al Open Day.
             </p>
           </div>
+
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setMostrarFiltros((actual) => !actual)}
+          >
+            <Filter size={15} />
+            {mostrarFiltros ? "Ocultar filtros" : "Filtros"}
+          </button>
         </div>
 
         <div className="registrations-toolbar">
           <div className="search-box">
-            <Search
-              size={17}
-              color="#91a1b3"
-              style={{
-                position: "absolute",
-                top: 13,
-                left: 13,
-                pointerEvents: "none",
-              }}
-            />
+            <Search size={17} />
+
             <input
               type="search"
               placeholder="Buscar por nombre, correo, celular..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              style={{ paddingLeft: 40 }}
             />
           </div>
 
@@ -1176,44 +1369,88 @@ function Dashboard() {
             </select>
           </div>
 
-          <div className="filter-group">
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              aria-label="Filtrar por tipo de visitante"
-            >
-              <option value="Todos">Todos los visitantes</option>
-              <option value="Estudiante">Estudiante</option>
-              <option value="Padre o madre">Padre o madre</option>
-              <option value="Tutor">Tutor</option>
-              <option value="Otro familiar">Otro familiar</option>
-            </select>
-          </div>
+          {mostrarFiltros && (
+            <>
+              <div className="filter-group">
+                <select
+                  value={filtroTipo}
+                  onChange={(e) => setFiltroTipo(e.target.value)}
+                  aria-label="Filtrar por tipo"
+                >
+                  <option value="Todos">Todos los visitantes</option>
+                  {TIPOS_VISITANTES.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {tipo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="filter-group">
+                <select
+                  value={filtroDistrito}
+                  onChange={(e) => setFiltroDistrito(e.target.value)}
+                  aria-label="Filtrar por distrito"
+                >
+                  <option value="Todos">Todos los distritos</option>
+                  {DISTRITOS_CANETE.map((distrito) => (
+                    <option key={distrito} value={distrito}>
+                      {distrito}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           <div className="filter-group">
             <select
-              value={filtroDistrito}
-              onChange={(e) => setFiltroDistrito(e.target.value)}
-              aria-label="Filtrar por distrito"
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+              aria-label="Ordenar inscripciones"
             >
-              <option value="Todos">Todos los distritos</option>
-              {opcionesDistritos.map((distrito) => (
-                <option key={distrito} value={distrito}>
-                  {distrito}
-                </option>
-              ))}
+              <option value="recientes">Más recientes</option>
+              <option value="antiguos">Más antiguos</option>
+              <option value="nombre">Orden alfabético</option>
             </select>
           </div>
 
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={limpiarFiltros}
-            title="Limpiar filtros"
-          >
-            <Filter size={15} />
-            Limpiar
-          </button>
+          {hayFiltrosActivos && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={limpiarFiltros}
+            >
+              <RotateCcw size={15} />
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        <div className="export-toolbar">
+          <span>
+            {inscripcionesFiltradas.length} registros encontrados
+          </span>
+
+          <div>
+            <button
+              type="button"
+              className="btn-export btn-export-light"
+              onClick={exportarCSV}
+            >
+              <FileSpreadsheet size={15} />
+              CSV
+            </button>
+
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exportarPDF}
+            >
+              <FileText size={15} />
+              PDF
+            </button>
+          </div>
         </div>
 
         <TablaInscripciones registros={inscripcionesPaginadas} />
@@ -1236,21 +1473,25 @@ function Dashboard() {
             <button
               type="button"
               disabled={paginaActual === 1}
-              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+              onClick={() =>
+                setPaginaActual((p) => Math.max(1, p - 1))
+              }
               aria-label="Página anterior"
             >
               <ChevronLeft size={15} />
             </button>
 
-            <button type="button" className="active">
-              {paginaActual}
-            </button>
+            <span className="pagination-current">
+              {paginaActual} / {totalPaginas}
+            </span>
 
             <button
               type="button"
               disabled={paginaActual >= totalPaginas}
               onClick={() =>
-                setPaginaActual((p) => Math.min(totalPaginas, p + 1))
+                setPaginaActual((p) =>
+                  Math.min(totalPaginas, p + 1)
+                )
               }
               aria-label="Página siguiente"
             >
@@ -1268,67 +1509,13 @@ function Dashboard() {
 
   const renderReportes = () => (
     <>
-      <div className="dashboard-header">
-        <div className="dashboard-welcome">
-          <h1>Reportes</h1>
-          <p>
-            Consulta la distribución de visitantes y el comportamiento
-            de las inscripciones.
-          </p>
-        </div>
+      <Encabezado
+        titulo="Reportes"
+        descripcion="Consulta la distribución de visitantes y el comportamiento de las inscripciones."
+        acciones={<BotonActualizar />}
+      />
 
-        <div className="dashboard-header-actions">
-          <div className="dashboard-date">
-            <CalendarDays
-              size={15}
-              style={{ marginRight: 7, verticalAlign: "middle" }}
-            />
-            {fechaHoy}
-          </div>
-        </div>
-      </div>
-
-      <div className="dashboard-stats">
-        <div className="stat-card total">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Total registrados</span>
-            <div className="stat-card-icon"><Users /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.total}</strong>
-          <span className="stat-card-description">Todos los visitantes</span>
-        </div>
-
-        <div className="stat-card confirmed">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Confirmaciones</span>
-            <div className="stat-card-icon"><CalendarCheck /></div>
-          </div>
-          <strong className="stat-card-value">
-            {estadisticas.confirmadas}
-          </strong>
-          <span className="stat-card-description">
-            Visitantes confirmados
-          </span>
-        </div>
-
-        <div className="stat-card pending">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Pendientes</span>
-            <div className="stat-card-icon"><Clock3 /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.pendientes}</strong>
-          <span className="stat-card-description">Por gestionar</span>
-        </div>
-
-        <div className="stat-card cancelled">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Cancelaciones</span>
-            <div className="stat-card-icon"><CircleX /></div>
-          </div>
-          <strong className="stat-card-value">{estadisticas.canceladas}</strong>
-          <span className="stat-card-description">Registros cancelados</span>
-        </div>
-      </div>
+      <TarjetasEstadisticas />
 
       <div className="reports-grid">
         <section className="report-panel">
@@ -1346,8 +1533,11 @@ function Dashboard() {
                 <div className="report-item" key={item.nombre}>
                   <div className="report-item-header">
                     <span>{item.nombre}</span>
-                    <strong>{item.cantidad}</strong>
+                    <strong>
+                      {item.cantidad} ({Math.round(item.porcentaje)}%)
+                    </strong>
                   </div>
+
                   <div className="report-progress">
                     <div
                       className="report-progress-bar"
@@ -1358,11 +1548,12 @@ function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="empty-state">No hay datos disponibles.</div>
+            <div className="empty-state">
+              No hay datos disponibles.
+            </div>
           )}
         </section>
 
-        {/* REPORTE COMPLETO DE LOS 16 DISTRITOS */}
         <section className="report-panel">
           <div className="panel-header">
             <div>
@@ -1400,7 +1591,7 @@ function Dashboard() {
           <div className="panel-header">
             <div>
               <h2>Actividad de los últimos siete días</h2>
-              <p>Cantidad de inscripciones registradas por fecha</p>
+              <p>Cantidad de inscripciones por fecha</p>
             </div>
             <ChartNoAxesCombined size={19} color="#7790a8" />
           </div>
@@ -1415,11 +1606,14 @@ function Dashboard() {
                     {dia.cantidad === 1 ? "registro" : "registros"}
                   </strong>
                 </div>
+
                 <div className="report-progress">
                   <div
                     className="report-progress-bar"
                     style={{
-                      width: `${(dia.cantidad / maxActividad) * 100}%`,
+                      width: `${
+                        (dia.cantidad / maxActividad) * 100
+                      }%`,
                     }}
                   />
                 </div>
@@ -1428,6 +1622,30 @@ function Dashboard() {
           </div>
         </section>
       </div>
+
+      <section className="dashboard-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Resumen de cobertura distrital</h2>
+            <p>Los 16 distritos de la provincia de Cañete</p>
+          </div>
+          <MapPin size={20} color="#7790a8" />
+        </div>
+
+        <div className="district-summary">
+          <strong>{distritosCanete.filter((d) => d.cantidad > 0).length}</strong>
+          <span>de 16 distritos con visitantes registrados</span>
+        </div>
+
+        <div className="district-grid">
+          {distritosCanete.map((item) => (
+            <div className="district-card" key={item.nombre}>
+              <span>{item.nombre}</span>
+              <strong>{item.cantidad}</strong>
+            </div>
+          ))}
+        </div>
+      </section>
     </>
   );
 
@@ -1437,14 +1655,10 @@ function Dashboard() {
 
   const renderConfiguracion = () => (
     <>
-      <div className="dashboard-header">
-        <div className="dashboard-welcome">
-          <h1>Configuración</h1>
-          <p>
-            Información de la cuenta que administra el panel.
-          </p>
-        </div>
-      </div>
+      <Encabezado
+        titulo="Configuración"
+        descripcion="Información de la cuenta que administra el panel."
+      />
 
       <section className="dashboard-panel">
         <div className="panel-header">
@@ -1455,51 +1669,20 @@ function Dashboard() {
           <ShieldCheck size={21} color="#7790a8" />
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            padding: "20px",
-            marginBottom: 24,
-            background: "#f6f9fc",
-            border: "1px solid #e7edf4",
-            borderRadius: 14,
-          }}
-        >
-          <div
-            className="sidebar-avatar"
-            style={{
-              width: 58,
-              height: 58,
-              borderRadius: 16,
-              fontSize: 19,
-            }}
-          >
+        <div className="admin-profile">
+          <div className="sidebar-avatar admin-profile-avatar">
             {inicialesAdministrador}
           </div>
 
           <div>
-            <strong
-              style={{
-                display: "block",
-                color: "#123f70",
-                fontSize: 16,
-              }}
-            >
-              {nombreAdministrador}
-            </strong>
-            <span
-              style={{
-                display: "block",
-                marginTop: 5,
-                color: "#718096",
-                fontSize: 12,
-              }}
-            >
-              Administrador del sistema
-            </span>
+            <strong>{nombreAdministrador}</strong>
+            <span>Administrador del sistema</span>
           </div>
+
+          <span className="registration-status status-confirmada">
+            <Check size={12} />
+            Sesión activa
+          </span>
         </div>
 
         <div className="modal-body">
@@ -1514,26 +1697,22 @@ function Dashboard() {
           </div>
 
           <div className="modal-field">
-            <label>Rol</label>
-            <p>Administrador</p>
+            <label>Usuario</label>
+            <p>{administrador?.usuario || "No disponible"}</p>
           </div>
 
           <div className="modal-field">
-            <label>Estado de la sesión</label>
-            <p>
-              <span className="registration-status status-confirmada">
-                Activa
-              </span>
-            </p>
+            <label>Rol</label>
+            <p>Administrador</p>
           </div>
         </div>
       </section>
 
-      <section className="dashboard-panel" style={{ marginTop: 20 }}>
+      <section className="dashboard-panel settings-event-panel">
         <div className="panel-header">
           <div>
             <h2>Información del evento</h2>
-            <p>Datos generales del Open Day</p>
+            <p>Datos generales de la actividad</p>
           </div>
           <GraduationCap size={21} color="#7790a8" />
         </div>
@@ -1558,27 +1737,199 @@ function Dashboard() {
             <label>Base de datos</label>
             <p>MySQL</p>
           </div>
+
+          <div className="modal-field">
+            <label>Backend</label>
+            <p>PHP 8.3</p>
+          </div>
+
+          <div className="modal-field">
+            <label>Frontend</label>
+            <p>React + Vite</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="dashboard-panel settings-event-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Conexión del sistema</h2>
+            <p>Información del servicio de datos</p>
+          </div>
+          <Activity size={21} color="#7790a8" />
+        </div>
+
+        <div className="connection-information">
+          <div>
+            <span>Dirección del backend</span>
+            <strong>{API_URL}</strong>
+          </div>
+
+          <span className="connection-status">
+            <i />
+            Configurado
+          </span>
         </div>
       </section>
     </>
   );
 
   // ---------------------------------------------------
-  // VISTA PRINCIPAL
+  // MODAL DE DETALLES
+  // ---------------------------------------------------
+
+  const renderModal = () => {
+    if (!inscripcionSeleccionada) return null;
+
+    const item = inscripcionSeleccionada;
+
+    return (
+      <div
+        className="modal-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setInscripcionSeleccionada(null);
+          }
+        }}
+      >
+        <div
+          className="modal-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-inscripcion-title"
+        >
+          <div className="modal-header">
+            <div>
+              <h2 id="modal-inscripcion-title">
+                Detalle de inscripción
+              </h2>
+              <p>Información registrada del visitante</p>
+            </div>
+
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setInscripcionSeleccionada(null)}
+              aria-label="Cerrar"
+            >
+              <X size={19} />
+            </button>
+          </div>
+
+          <div className="modal-visitor-heading">
+            <div className="visitor-avatar modal-visitor-avatar">
+              {obtenerIniciales(item.nombre)}
+            </div>
+
+            <div>
+              <strong>{item.nombre || "Sin nombre"}</strong>
+              <span>{item.tipo_visitante || "Visitante"}</span>
+            </div>
+          </div>
+
+          <div className="modal-body">
+            <div className="modal-field full">
+              <label>Nombre completo</label>
+              <p>{item.nombre || "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Tipo de visitante</label>
+              <p>{item.tipo_visitante || "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Celular</label>
+              <p>{item.celular || "—"}</p>
+            </div>
+
+            <div className="modal-field full">
+              <label>Correo electrónico</label>
+              <p>{item.correo || "No registrado"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Colegio</label>
+              <p>{item.colegio || "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Grado</label>
+              <p>{item.grado || "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Distrito</label>
+              <p>{item.distrito || "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Número de asistentes</label>
+              <p>{item.asistentes ?? "—"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Fecha de registro</label>
+              <p>{formatearFechaCompleta(item.fecha_registro)}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Estado actual</label>
+              <p>
+                <EstadoBadge estado={item.estado} />
+              </p>
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setInscripcionSeleccionada(null)}
+            >
+              Cerrar
+            </button>
+
+            <select
+              value={item.estado || "Pendiente"}
+              disabled={actualizandoEstado === item.id}
+              onChange={(e) =>
+                cambiarEstado(item.id, e.target.value)
+              }
+              aria-label="Actualizar estado de la inscripción"
+            >
+              {ESTADOS.map((estado) => (
+                <option key={estado} value={estado}>
+                  {estado}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------
+  // PANTALLA DE CARGA
   // ---------------------------------------------------
 
   if (cargando) {
     return (
       <div className="dashboard-loading">
         <div className="loading-spinner" />
-        Cargando información del panel...
+        <strong>Cargando información del panel...</strong>
+        <span>Estamos consultando las inscripciones.</span>
       </div>
     );
   }
 
+  // ---------------------------------------------------
+  // VISTA PRINCIPAL
+  // ---------------------------------------------------
+
   return (
     <div className="dashboard-page">
-      {/* MENÚ LATERAL */}
       <aside className="dashboard-sidebar">
         <div className="sidebar-logo">
           <img
@@ -1632,17 +1983,27 @@ function Dashboard() {
         </div>
       </aside>
 
-      {/* CONTENIDO */}
       <main className="dashboard-main">
         <div className="dashboard-content">
           {error && (
-            <div className="dashboard-error">
-              {error}
+            <div className="dashboard-error" role="alert">
+              <AlertCircle size={18} />
+              <span>{error}</span>
+
+              <button
+                type="button"
+                onClick={() => cargarDatos(false)}
+                aria-label="Reintentar conexión"
+              >
+                <RotateCcw size={15} />
+                Reintentar
+              </button>
             </div>
           )}
 
           {mensaje && (
-            <div className="dashboard-success">
+            <div className="dashboard-success" role="status">
+              <Check size={17} />
               {mensaje}
             </div>
           )}
@@ -1659,122 +2020,7 @@ function Dashboard() {
         </div>
       </main>
 
-      {/* MODAL DE DETALLES */}
-      {inscripcionSeleccionada && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setInscripcionSeleccionada(null);
-            }
-          }}
-        >
-          <div
-            className="modal-content"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-inscripcion-title"
-          >
-            <div className="modal-header">
-              <div>
-                <h2 id="modal-inscripcion-title">
-                  Detalle de inscripción
-                </h2>
-                <p
-                  style={{
-                    margin: "5px 0 0",
-                    color: "#718096",
-                    fontSize: 11,
-                  }}
-                >
-                  Información registrada del visitante
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => setInscripcionSeleccionada(null)}
-                aria-label="Cerrar"
-              >
-                <X size={19} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="modal-field full">
-                <label>Nombre completo</label>
-                <p>{inscripcionSeleccionada.nombre || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Tipo de visitante</label>
-                <p>{inscripcionSeleccionada.tipo_visitante || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Celular</label>
-                <p>{inscripcionSeleccionada.celular || "—"}</p>
-              </div>
-
-              <div className="modal-field full">
-                <label>Correo electrónico</label>
-                <p>
-                  {inscripcionSeleccionada.correo || "No registrado"}
-                </p>
-              </div>
-
-              <div className="modal-field">
-                <label>Colegio</label>
-                <p>{inscripcionSeleccionada.colegio || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Grado</label>
-                <p>{inscripcionSeleccionada.grado || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Distrito</label>
-                <p>{inscripcionSeleccionada.distrito || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Número de asistentes</label>
-                <p>{inscripcionSeleccionada.asistentes || "—"}</p>
-              </div>
-
-              <div className="modal-field">
-                <label>Fecha de registro</label>
-                <p>
-                  {formatearFechaCompleta(
-                    inscripcionSeleccionada.fecha_registro
-                  )}
-                </p>
-              </div>
-
-              <div className="modal-field">
-                <label>Estado actual</label>
-                <p>
-                  <EstadoBadge
-                    estado={inscripcionSeleccionada.estado}
-                  />
-                </p>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setInscripcionSeleccionada(null)}
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderModal()}
     </div>
   );
 }
