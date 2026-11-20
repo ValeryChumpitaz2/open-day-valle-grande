@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
@@ -13,7 +12,8 @@ import {
 } from "lucide-react";
 
 import "./Login.css";
-import API_URL from '../config/api';
+import API_URL from "../config/api";
+
 function Login() {
   const navigate = useNavigate();
 
@@ -23,36 +23,56 @@ function Login() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
+  // INICIO DE SESIÓN
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setCargando(true);
 
     try {
-const response = await fetch(`${API_URL}/login.php`, {
-          method: "POST",
+      const response = await fetch(`${API_URL}/login.php`, {
+        method: "POST",
         credentials: "include",
         headers: {
-          "Content-Type": "text/plain"
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ correo, password })
+        body: JSON.stringify({
+          correo: correo.trim(),
+          password
+        })
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "No se pudo iniciar sesión.");
+        throw new Error(
+          data.message || "No se pudo iniciar sesión."
+        );
       }
 
+      // GUARDAR DATOS DEL ADMINISTRADOR
       sessionStorage.setItem(
         "administrador",
         JSON.stringify(data.administrador)
       );
 
+      // REDIRIGIR AL DASHBOARD
       navigate("/dashboard");
 
     } catch (err) {
-      setError(err.message || "No se pudo conectar con el servidor.");
+      console.error("Error en el inicio de sesión:", err);
+
+      if (err instanceof TypeError) {
+        setError(
+          "No se pudo conectar con el servidor. Verifica tu conexión e inténtalo nuevamente."
+        );
+      } else {
+        setError(
+          err.message || "Ocurrió un error al iniciar sesión."
+        );
+      }
+
     } finally {
       setCargando(false);
     }
@@ -89,6 +109,7 @@ const response = await fetch(`${API_URL}/login.php`, {
             </div>
 
             <div className="login-image-message">
+
               <span className="login-tag">
                 OPEN DAY 2026 · 12 DE DICIEMBRE
               </span>
@@ -104,11 +125,17 @@ const response = await fetch(`${API_URL}/login.php`, {
                 conocer nuestras carreras y construir el camino hacia
                 tu futuro profesional.
               </p>
+
             </div>
 
             <div className="login-image-footer">
-              <span>FORMANDO PERSONAS, TRANSFORMANDO VIDAS</span>
-              <span>VALLE GRANDE · 2026</span>
+              <span>
+                FORMANDO PERSONAS, TRANSFORMANDO VIDAS
+              </span>
+
+              <span>
+                VALLE GRANDE · 2026
+              </span>
             </div>
 
           </div>
@@ -120,6 +147,7 @@ const response = await fetch(`${API_URL}/login.php`, {
           <div className="login-form-content">
 
             <div className="login-form-heading">
+
               <div className="login-icon">
                 <ShieldCheck size={25} />
               </div>
@@ -128,22 +156,31 @@ const response = await fetch(`${API_URL}/login.php`, {
                 SISTEMA DE GESTIÓN
               </span>
 
-              <h2>Acceso administrativo</h2>
+              <h2>
+                Acceso administrativo
+              </h2>
 
               <p>
                 Bienvenido. Ingresa tus credenciales para
                 administrar las inscripciones del Open Day.
               </p>
+
             </div>
 
-            <form onSubmit={handleSubmit} className="login-form">
+            <form
+              onSubmit={handleSubmit}
+              className="login-form"
+            >
 
+              {/* CORREO ELECTRÓNICO */}
               <div className="login-field">
+
                 <label htmlFor="correo">
                   Correo electrónico
                 </label>
 
                 <div className="login-input-wrapper">
+
                   <Mail size={19} />
 
                   <input
@@ -155,15 +192,19 @@ const response = await fetch(`${API_URL}/login.php`, {
                     autoComplete="username"
                     required
                   />
+
                 </div>
               </div>
 
+              {/* CONTRASEÑA */}
               <div className="login-field">
+
                 <label htmlFor="password">
                   Contraseña
                 </label>
 
                 <div className="login-input-wrapper">
+
                   <LockKeyhole size={19} />
 
                   <input
@@ -179,7 +220,9 @@ const response = await fetch(`${API_URL}/login.php`, {
                   <button
                     type="button"
                     className="login-password-toggle"
-                    onClick={() => setMostrarPassword(!mostrarPassword)}
+                    onClick={() =>
+                      setMostrarPassword(!mostrarPassword)
+                    }
                     aria-label={
                       mostrarPassword
                         ? "Ocultar contraseña"
@@ -191,23 +234,30 @@ const response = await fetch(`${API_URL}/login.php`, {
                       : <Eye size={19} />
                     }
                   </button>
+
                 </div>
               </div>
 
+              {/* MENSAJE DE ERROR */}
               {error && (
-                <div className="login-error">
+                <div className="login-error" role="alert">
                   {error}
                 </div>
               )}
 
+              {/* BOTÓN DE INGRESO */}
               <button
                 type="submit"
                 className="login-button"
                 disabled={cargando}
               >
+
                 {cargando ? (
                   <>
-                    <LoaderCircle className="login-spinner" size={19} />
+                    <LoaderCircle
+                      className="login-spinner"
+                      size={19}
+                    />
                     Verificando acceso...
                   </>
                 ) : (
@@ -216,13 +266,18 @@ const response = await fetch(`${API_URL}/login.php`, {
                     <ArrowRight size={19} />
                   </>
                 )}
+
               </button>
 
             </form>
 
+            {/* SEGURIDAD */}
             <div className="login-security">
               <ShieldCheck size={18} />
-              <span>Acceso exclusivo para personal autorizado</span>
+
+              <span>
+                Acceso exclusivo para personal autorizado
+              </span>
             </div>
 
           </div>
