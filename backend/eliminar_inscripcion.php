@@ -1,79 +1,96 @@
-
 <?php
 
 ob_start();
 
+ini_set("display_errors", "0");
+ini_set("log_errors", "1");
+error_reporting(E_ALL);
+
 header("Content-Type: application/json; charset=UTF-8");
+header("Vary: Origin");
+
+$frontends = getenv("FRONTEND_URLS")
+    ?: "https://openday.vallegrande.edu.pe,http://localhost:5173";
 
 $origenesPermitidos = array_filter(
-    array_map(
-        "trim",
-        explode(",", getenv("FRONTEND_URLS") ?: "")
-    )
+    array_map("trim", explode(",", $frontends))
 );
 
 $origen = $_SERVER["HTTP_ORIGIN"] ?? "";
 
-if (in_array($origen, $origenesPermitidos, true)) {
+if ($origen !== "" && in_array($origen, $origenesPermitidos, true)) {
     header("Access-Control-Allow-Origin: " . $origen);
     header("Access-Control-Allow-Credentials: true");
-    header("Vary: Origin");
 }
 
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Accept");
 
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    http_response_code(204);
-    exit;
-}
-
-function responder($success, $mensaje, $codigo = 200)
+function responder($codigo, $datos)
 {
     http_response_code($codigo);
 
-    if (ob_get_length()) {
+    if (ob_get_level() > 0 && ob_get_length() !== false) {
         ob_clean();
     }
 
     echo json_encode(
-        [
-            "success" => $success,
-            "mensaje" => $mensaje
-        ],
-        JSON_UNESCAPED_UNICODE
+        $datos,
+        JSON_UNESCAPED_UNICODE |
+        JSON_UNESCAPED_SLASHES
     );
 
     exit;
 }
 
+// Preflight
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    http_response_code(204);
+    exit;
+}
+
+// Validar método
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    responder(false, "Método no permitido.", 405);
+    responder(405, [
+        "success" => false,
+        "mensaje" => "Método no permitido."
+    ]);
 }
 
-session_set_cookie_params([
-    "lifetime" => 0,
-    "path" => "/",
-    "secure" => true,
-    "httponly" => true,
-    "samesite" => "None"
-]);
+// Configuración de sesión: igual que login.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        "lifetime" => 0,
+        "path" => "/",
+        "secure" => true,
+        "httponly" => true,
+        "samesite" => "None"
+    ]);
 
-session_start();
+    session_start();
+}
 
-// Validar sesión administrativa
+// Validar administrador
+$administrador = $_SESSION["administrador"] ?? null;
+
 if (
-    empty($_SESSION["administrador"]) &&
-    empty($_SESSION["admin"])
+    !is_array($administrador) ||
+    empty($administrador["id"])
 ) {
-    responder(false, "Sesión no autorizada. Inicia sesión nuevamente.", 401);
+    responder(401, [
+        "success" => false,
+        "mensaje" => "Sesión no autorizada. Inicia sesión nuevamente."
+    ]);
 }
 
-// Leer información enviada por React
+// Leer JSON
 $datos = json_decode(file_get_contents("php://input"), true);
 
 if (!is_array($datos) || !isset($datos["id"])) {
-    responder(false, "No se recibió el identificador de la inscripción.", 400);
+    responder(400, [
+        "success" => false,
+        "mensaje" => "No se recibió el ID de la inscripción."
+    ]);
 }
 
 $id = filter_var(
@@ -83,48 +100,50 @@ $id = filter_var(
 );
 
 if ($id === false) {
-    responder(false, "El identificador de la inscripción no es válido.", 400);
+    responder(400, [
+        "success" => false,
+        "mensaje" => "El ID de la inscripción no es válido."
+    ]);
 }
 
 try {
+
+    // Conexión a MySQL
     require_once __DIR__ . "/config/database.php";
+
     $database = new Database();
     $conexion = $database->connect();
 
-    // Comprobar que el registro exista
-    $consulta = $conexion->prepare(
-        "SELECT id FROM inscripciones WHERE id = :id LIMIT 1"
-    );
+    // Eliminar registro
+    $sql = "DELETE FROM inscripciones WHERE id = :id";
+
+    $consulta = $conexion->prepare($sql);
 
     $consulta->execute([
         ":id" => $id
     ]);
 
-    if (!$consulta->fetch()) {
-        responder(false, "La inscripción no existe o ya fue eliminada.", 404);
+    if ($consulta->rowCount() !== 1) {
+        responder(404, [
+            "success" => false,
+            "mensaje" => "La inscripción no existe o ya fue eliminada."
+        ]);
     }
 
-    // Eliminar inscripción
-    $eliminar = $conexion->prepare(
-        "DELETE FROM inscripciones WHERE id = :id"
-    );
-
-    $eliminar->execute([
-        ":id" => $id
+    responder(200, [
+        "success" => true,
+        "mensaje" => "Inscripción eliminada correctamente.",
+        "id" => $id
     ]);
 
-    if ($eliminar->rowCount() !== 1) {
-        responder(false, "No se pudo eliminar la inscripción.", 500);
-    }
+} catch (Throwable $error) {
 
-    responder(true, "Inscripción eliminada correctamente.");
-
-} catch (Throwable $e) {
-    error_log("Error al eliminar inscripción: " . $e->getMessage());
-
-    responder(
-        false,
-        "Ocurrió un error al eliminar la inscripción.",
-        500
+    error_log(
+        "ERROR ELIMINAR INSCRIPCIÓN: " . $error->getMessage()
     );
+
+    responder(500, [
+        "success" => false,
+        "mensaje" => "No se pudo eliminar la inscripción. Revisa los registros del servidor."
+    ]);
 }
