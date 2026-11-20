@@ -1,13 +1,10 @@
-
 <?php
 
 ob_start();
 
-ini_set("display_errors", "0");
-error_reporting(E_ALL);
-
 header("Content-Type: application/json; charset=UTF-8");
 header("Vary: Origin");
+
 header("Cache-Control: no-store, no-cache, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
